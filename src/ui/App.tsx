@@ -137,6 +137,7 @@ export function App() {
           <p>Скоро здесь.</p>
           <p className="mute">Каркас готов — экран появится на этапе 2.</p>
         </section>
+        <p className="build">сборка {__BUILD__}</p>
       </main>
 
       <nav className="tabbar">
