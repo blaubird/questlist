@@ -1,0 +1,32 @@
+/* Токены дизайн-системы — docs/DESIGN.md */
+:root {
+  --bg: #0b0a0e;
+  --p1: #131217;
+  --p2: #18171d;
+  --card: #111015;
+  --line: #2a2831;
+  --ink: #eeedf3;
+  --mute: #8e8b98;
+  --ink-dark: #16141b;
+  --pearl: linear-gradient(135deg, #f6f4fa 0%, #cdd6e2 32%, #ebe0f0 62%, #f7f3e8 100%);
+  --hair: linear-gradient(135deg, #ffffff40, #ffffff0d 38%, #e6dcf238 68%, #ffffff1f);
+
+  --r-common: #9aa3b5;
+  --r-rare: #4fa8ff;
+  --r-epic: #c86bff;
+  --r-legend: #ffc94d;
+
+  --c-gold: #ffc94d;
+  --c-torch: #ff7b3a;
+  --c-shard: #4fd8e8;
+
+  --f-head: 'Cormorant Garamond', Georgia, serif;
+  --f-body: 'Manrope', system-ui, sans-serif;
+
+  --radius: 20px;
+  --tap: 44px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -1,0 +1,23 @@
+node_modules/
+dist/
+dev-dist/
+*.tsbuildinfo
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# секреты
+.env
+.env.*
+!.env.example
+
+# PocketBase: данные только на компе
+pb_data/
+deploy/.pb_dev/
+
+# оригиналы паков ассетов — большие; в репо идёт только отобранное в src/assets
+assets-inbox/*
+!assets-inbox/README.md
+
+reference/my-save.json
