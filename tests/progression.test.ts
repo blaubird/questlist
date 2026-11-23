@@ -23,9 +23,9 @@ describe('масштаб', () => {
     expect(monScale(SCALE_FROM + 10).hp).toBeCloseTo((1 + 0.12 * (SCALE_FROM + 9)) * MON_GROWTH.hp ** 10, 6)
   })
 
-  it('этаж 1000 генерируется, числа конечные', () => {
+  it('этаж 5000 генерируется, числа конечные (запас до 1e308 — примерно до этажа 9000)', () => {
     let id = 0
-    const fl = genFloor(1000, createRng(2), () => ++id)
+    const fl = genFloor(5000, createRng(2), () => ++id)
     for (const m of fl.mons) {
       expect(Number.isFinite(m.hp)).toBe(true)
       expect(m.hp).toBeGreaterThan(1e20)

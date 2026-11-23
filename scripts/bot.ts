@@ -6,7 +6,7 @@ import type { Run } from '../src/core/dungeon/types.ts'
 import { apply, blessOpen, potionCost, type Action, type Ctx } from '../src/core/engine.ts'
 import { blessCost, enhCost, gearComplete, heroStats } from '../src/core/hero.ts'
 import { createRng } from '../src/core/rng.ts'
-import { freshState, type GameState } from '../src/core/state.ts'
+import { freshState, type GameState, type Profile } from '../src/core/state.ts'
 
 export interface DayRow {
   d: number
@@ -35,6 +35,10 @@ export interface BotOptions {
   leaveDepth?: number
   /** Вызывается после каждого дня (прогресс долгих прогонов). */
   onDay?: (row: DayRow, steps: number) => void
+  /** Стартовый профиль поверх нового (проверка дальних этажей без прогона всего года). */
+  profile?: Partial<Profile>
+  /** Сколько забегов за день упёрлись в лимит шагов. */
+  onStuck?: (day: number, floor: number) => void
 }
 
 const DIRS = [
@@ -101,6 +105,7 @@ export function simulate(days: number, seed = 1, opt: BotOptions = {}): DayRow[]
   let n = 0
   const base = Date.UTC(2026, 0, 1)
   let state: GameState = freshState(dayStr(base, 0))
+  if (opt.profile) state = { ...state, profile: { ...state.profile, ...opt.profile } }
   let now = base + 9 * 3_600_000
   let day = dayStr(base, 0)
   let yesterday = dayStr(base, -1)
@@ -225,6 +230,7 @@ export function simulate(days: number, seed = 1, opt: BotOptions = {}): DayRow[]
       if (state.run) {
         // застрял — засчитываем этаж и выходим без добычи
         maxf = Math.max(maxf, state.run.f)
+        opt.onStuck?.(d, state.run.f)
         state = { ...state, run: null }
       }
     }

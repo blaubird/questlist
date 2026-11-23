@@ -45,3 +45,17 @@ describe('бот баланса: поздняя игра без стен и бе
     for (let i = 61; i < 90; i++) expect(rows[i]!.cp - rows[i - 1]!.cp).toBeLessThan(25)
   })
 }, 120_000)
+
+describe('бот баланса: дальние этажи', () => {
+  it('на этажах 2400+ забеги не зависают (бессмертие + бессильная атака на double)', () => {
+    let stuck = 0
+    const cp = 2401
+    const e = Math.round(cp * 1.25)
+    const rows = simulate(2, 1, {
+      profile: { checkpoint: cp, best: cp, lvl: cp * 2, weapon: 9, armor: 9, wEnh: e, aEnh: e, souls: 476 },
+      onStuck: () => stuck++,
+    })
+    expect(stuck).toBe(0)
+    expect(rows.at(-1)!.cp).toBeGreaterThan(cp)
+  })
+}, 60_000)
