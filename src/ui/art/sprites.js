@@ -1,6 +1,6 @@
-// Процедурные спрайты героев и символов слотов — перенесено из reference/prototype-v1.html как есть.
-// Возвращают data:image/svg+xml URI. Типы — в sprites.d.ts.
-/* eslint-disable */
+// Процедурная графика — перенесено из reference/prototype-v1.html как есть (собственная работа владельца).
+// Герои, монстры, боссы, предметы, портал, символы слотов — data:image/svg+xml URI; тайлы краёв — canvas.
+// Типы — в sprites.d.ts.
 const OL = '#1b1124'
 const O = ` stroke="${OL}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"`
 const uri = (body, vb, defs = '') =>
@@ -838,6 +838,219 @@ const SKIN_LIST = [
   ],
 ]
 
+/* --- monsters (viewBox 0 0 64 64) --- */
+const SH = `<ellipse cx="32" cy="60" rx="15" ry="3" fill="#000" opacity=".35"/>`
+const EYE = (x, y, c, r = 2) =>
+  `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/><circle cx="${x - r * 0.35}" cy="${y - r * 0.35}" r="${r * 0.35}" fill="#fff"/>`
+const MON_SVG = {
+  rat: () =>
+    SH +
+    `<path d="M46 50 C57 48 61 39 56 32" stroke="#e59aa8" stroke-width="2.6" fill="none" stroke-linecap="round"/><ellipse cx="36" cy="47" rx="14" ry="10" fill="#7d7590"${O}/><circle cx="21" cy="41" r="9" fill="#8d85a1"${O}/><circle cx="17" cy="32" r="4.6" fill="#8d85a1"${O}/><circle cx="17" cy="32" r="2.4" fill="#e59aa8"/><circle cx="26" cy="31.5" r="4.6" fill="#8d85a1"${O}/><circle cx="26" cy="31.5" r="2.4" fill="#e59aa8"/><circle cx="12.6" cy="43" r="2" fill="#e59aa8"${O}/>` +
+    EYE(19, 39, '#ff4d5e', 1.9) +
+    `<path d="M15 47 L16 50 L17.4 47Z" fill="#fff"/><ellipse cx="28" cy="56" rx="3" ry="1.6" fill="#e59aa8"/><ellipse cx="42" cy="56" rx="3" ry="1.6" fill="#e59aa8"/>`,
+  bat: () =>
+    SH +
+    `<path d="M28 34 C22 24 10 20 3 24 C7 27 6 31 3 35 C8 34 11 37 10 42 C15 39 21 41 26 44Z" fill="#3b2554"${O}/>` +
+    mirror(
+      `<path d="M28 34 C22 24 10 20 3 24 C7 27 6 31 3 35 C8 34 11 37 10 42 C15 39 21 41 26 44Z" fill="#3b2554"${O}/>`,
+    ) +
+    `<path d="M25 24 L26 15 L30 22Z" fill="#5a3a7a"${O}/><path d="M39 24 L38 15 L34 22Z" fill="#5a3a7a"${O}/><circle cx="32" cy="33" r="10" fill="#5a3a7a"${O}/>` +
+    EYE(28.4, 31, '#ffd84d', 2.2) +
+    EYE(35.6, 31, '#ffd84d', 2.2) +
+    `<path d="M29.5 37 L30.5 40 L31.4 37 M32.6 37 L33.5 40 L34.5 37" fill="#fff" stroke="#fff" stroke-width=".6"/>`,
+  spider: () => {
+    const L = [0, 1, 2, 3]
+      .map((i) =>
+        limb(
+          `M30 ${38 + i * 3} C${20 - i * 2} ${30 + i * 4} ${10 - i} ${40 + i * 3} ${6 + i * 2} ${52 + i * 2}`,
+          '#5a4870',
+          1.8,
+        ),
+      )
+      .join('')
+    return (
+      SH +
+      L +
+      mirror(L) +
+      `<ellipse cx="32" cy="45" rx="13" ry="10.5" fill="#2d2236"${O}/><path d="M29 41 L35 41 L32 45 L35 49 L29 49 L32 45Z" fill="#d8364b"/><circle cx="32" cy="31" r="7.5" fill="#3a2d45"${O}/>` +
+      EYE(29, 29.5, '#ff4d5e', 1.5) +
+      EYE(35, 29.5, '#ff4d5e', 1.5) +
+      EYE(30.4, 33.4, '#ff4d5e', 1) +
+      EYE(33.6, 33.4, '#ff4d5e', 1)
+    )
+  },
+  goblin: () =>
+    SH +
+    limb('M27 52 L26 59', '#4a3a2a', 3.6) +
+    limb('M37 52 L38 59', '#4a3a2a', 3.6) +
+    `<path d="M24 38 L40 38 L42 54 L22 54Z" fill="#7a5a3a"${O}/>` +
+    limb('M24 41 L18 48', '#6fbf5a', 3.2) +
+    `<path d="M16 48 L12 36 L14.5 35.6 L18.4 47Z" fill="#cfd6e2"${O}/><path d="M20 24 L5 18 L19 30Z" fill="#6fbf5a"${O}/>` +
+    mirror(`<path d="M20 24 L5 18 L19 30Z" fill="#6fbf5a"${O}/>`) +
+    `<ellipse cx="32" cy="27" rx="12.5" ry="11" fill="#6fbf5a"${O}/>` +
+    EYE(27.5, 26, '#ffd84d', 2.3) +
+    EYE(36.5, 26, '#ffd84d', 2.3) +
+    `<path d="M26 32 Q32 37 38 32 Q32 34.6 26 32Z" fill="${OL}"/><path d="M28 33 L29 35 L30 33.6 M34 33.6 L35 35 L36 33" fill="#fff"/>`,
+  skeleton: () =>
+    SH +
+    limb('M28 48 L27 59', '#ece6d6', 2.4) +
+    limb('M36 48 L37 59', '#ece6d6', 2.4) +
+    limb('M32 31 L32 48', '#ece6d6', 2.6) +
+    [36, 40, 44]
+      .map(
+        (y) =>
+          `<path d="M25 ${y} Q32 ${y - 3} 39 ${y}" stroke="${OL}" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M25 ${y} Q32 ${y - 3} 39 ${y}" stroke="#ece6d6" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+      )
+      .join('') +
+    limb('M25 35 L19 46', '#ece6d6', 2.2) +
+    limb('M39 35 L45 46', '#ece6d6', 2.2) +
+    `<path d="M45 46 L49 26 L51 26.4 L47 46.6Z" fill="#a8a094"${O}/><circle cx="32" cy="21" r="11" fill="#ece6d6"${O}/><path d="M25 27 L39 27 L37 32 L27 32Z" fill="#ece6d6"${O}/><ellipse cx="27.6" cy="21" rx="3" ry="3.4" fill="#120a18"/><ellipse cx="36.4" cy="21" rx="3" ry="3.4" fill="#120a18"/><circle cx="27.6" cy="21.4" r="1.4" fill="#4fd8e8"/><circle cx="36.4" cy="21.4" r="1.4" fill="#4fd8e8"/><path d="M29 29 V32 M32 29 V32 M35 29 V32" stroke="${OL}" stroke-width=".8"/>`,
+  wolf: () =>
+    SH +
+    `<ellipse cx="38" cy="47" rx="16" ry="10" fill="#5f6476"${O}/><path d="M52 44 C60 40 61 32 57 28 C57 35 54 39 50 41Z" fill="#5f6476"${O}/>` +
+    limb('M30 53 L29 59', '#5f6476', 4) +
+    limb('M44 53 L45 59', '#5f6476', 4) +
+    `<path d="M14 26 L18 12 L24 22Z" fill="#6f7486"${O}/><path d="M28 22 L34 11 L35 25Z" fill="#6f7486"${O}/><path d="M12 30 C12 20 34 18 36 30 C37 38 30 43 22 43 L8 39 C5 38 5 34 8 33Z" fill="#6f7486"${O}/><path d="M8 37 L22 40" stroke="${OL}" stroke-width="1"/><path d="M10 37.4 L11 40 L12.4 37.8 M15 38.4 L16 41 L17.2 38.8" fill="#fff"/><circle cx="6.6" cy="34.4" r="1.6" fill="${OL}"/>` +
+    EYE(19, 29, '#ffd84d', 2.1) +
+    `<path d="M22 32 Q30 34 34 30" stroke="#d9dbe6" stroke-width="2" fill="none"/>`,
+  zombie: () =>
+    SH +
+    limb('M28 50 L27 59', '#3a4a6a', 3.8) +
+    limb('M36 50 L37 59', '#3a4a6a', 3.8) +
+    `<path d="M24 36 L40 36 L41 52 L35 49 L32 53 L28 49 L23 52Z" fill="#4d6a9a"${O}/>` +
+    limb('M25 39 L12 41', '#8fb38a', 3.4) +
+    limb('M39 39 L52 41', '#8fb38a', 3.4) +
+    `<circle cx="32" cy="24" r="11" fill="#8fb38a"${O}/><path d="M22 19 C24 11 40 11 42 19 C38 15 34 17 30 14 C28 17 25 16 22 19Z" fill="#3a3a2a"${O}/>` +
+    EYE(27.5, 24, '#f4f4e0', 2.4) +
+    `<circle cx="36.5" cy="24" r="2" fill="#d8364b"/><path d="M27 30 Q30 28.6 33 30.6 Q35 29.4 37 30" stroke="${OL}" stroke-width="1.2" fill="none"/><path d="M35 17 L39 21 M37 17 L35 19.4 M39 19 L37 21" stroke="${OL}" stroke-width=".8"/>`,
+  snake: () =>
+    SH +
+    `<ellipse cx="32" cy="53" rx="17" ry="6.4" fill="#3f9a5e"${O}/><ellipse cx="33" cy="46" rx="13.5" ry="6" fill="#4fae6e"${O}/><ellipse cx="31" cy="39.5" rx="10" ry="5" fill="#5fc07e"${O}/><path d="M28 39 C24 33 24 28 26 24" stroke="${OL}" stroke-width="8.4" fill="none" stroke-linecap="round"/><path d="M28 39 C24 33 24 28 26 24" stroke="#5fc07e" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M20 47 Q24 44 28 47 Q32 44 36 47 Q40 44 44 47" stroke="#d8e88a" stroke-width="1.4" fill="none"/><ellipse cx="27" cy="20" rx="9" ry="6.6" fill="#5fc07e"${O}/><path d="M19 22 L13 23 L11 21 M13 23 L11 25" stroke="#ff4d5e" stroke-width="1.1" fill="none"/><path d="M21 24 L22 27 L23 24.4" fill="#fff"/>` +
+    `<ellipse cx="27" cy="18" rx="2.2" ry="2.4" fill="#ffd84d"/><path d="M27 16 V20" stroke="${OL}" stroke-width="1"/><ellipse cx="33" cy="18" rx="2" ry="2.2" fill="#ffd84d"/><path d="M33 16.2 V19.8" stroke="${OL}" stroke-width="1"/>`,
+  ogre: () =>
+    SH +
+    limb('M25 50 L24 59', '#6b7a45', 6) +
+    limb('M39 50 L40 59', '#6b7a45', 6) +
+    `<ellipse cx="32" cy="41" rx="17" ry="15" fill="#8a9a5b"${O}/><ellipse cx="32" cy="45" rx="10" ry="8" fill="#a7b77a"/><path d="M19 49 L45 49 L43 56 L21 56Z" fill="#6b4a2a"${O}/>` +
+    limb('M16 38 L12 50', '#8a9a5b', 5) +
+    limb('M48 38 L52 30', '#8a9a5b', 5) +
+    `<path d="M50 32 L56 8 Q61 7 60 13 L54 33Z" fill="#7a5233"${O}/><circle cx="57" cy="12" r="1.2" fill="#cfd6e2"/><circle cx="32" cy="22" r="9.5" fill="#8a9a5b"${O}/><path d="M25 18.6 L39 18.6" stroke="${OL}" stroke-width="2.2"/>` +
+    EYE(28.5, 21.6, '#ff7b3a', 1.7) +
+    EYE(35.5, 21.6, '#ff7b3a', 1.7) +
+    `<path d="M27 27 L28 31 L29.4 27.6 M36.6 27.6 L36 31 L37 27" fill="#f4f0e0"${O}/>`,
+  ghost: () => {
+    return `<ellipse cx="32" cy="60" rx="12" ry="2.6" fill="#4fd8e8" opacity=".25"/><path d="M14 56 L14 30 C14 10 50 10 50 30 L50 56 L44 51 L38 56 L32 51 L26 56 L20 51Z" fill="#e6f2ff" opacity=".92"${O}/><path d="M16 30 C16 18 26 14 32 14" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/><ellipse cx="25.5" cy="30" rx="3.2" ry="4.4" fill="#1b2a4a"/><ellipse cx="38.5" cy="30" rx="3.2" ry="4.4" fill="#1b2a4a"/><circle cx="25.5" cy="31" r="1.2" fill="#4fd8e8"/><circle cx="38.5" cy="31" r="1.2" fill="#4fd8e8"/><ellipse cx="32" cy="41" rx="3.4" ry="4.4" fill="#1b2a4a"/>`
+  },
+  demon: () =>
+    SH +
+    `<path d="M40 50 C52 54 56 46 52 40 L56 38 L53 35 L50 40" stroke="${OL}" stroke-width="3.6" fill="none" stroke-linecap="round"/><path d="M40 50 C52 54 56 46 52 40" stroke="#c22a40" stroke-width="2" fill="none"/>` +
+    WINGS.bat('#5a1030').replace(/<g/g, '<g opacity=".95"') +
+    limb('M27 51 L26 59', '#a3243a', 4) +
+    limb('M37 51 L38 59', '#a3243a', 4) +
+    `<path d="M23.5 36 Q32 33 40.5 36 L41 52 L23 52Z" fill="#d8364b"${O}/>` +
+    limb('M24 38 L18 47', '#d8364b', 3.6) +
+    limb('M14 22 L20 58', '#3a2a2a', 1.8) +
+    `<path d="M11 22 L14 12 L17 22 M14 12 L14 24 M11 18 L17 18" stroke="#ffc94d" stroke-width="1.6" fill="none"/><circle cx="32" cy="24" r="11" fill="#d8364b"${O}/><path d="M23 17 C18 13 18 6 21 3 C22 8 24 11 27 13Z" fill="#2b1a22"${O}/>` +
+    mirror(`<path d="M23 17 C18 13 18 6 21 3 C22 8 24 11 27 13Z" fill="#2b1a22"${O}/>`) +
+    EYE(27.5, 23.5, '#ffd84d', 2.2) +
+    EYE(36.5, 23.5, '#ffd84d', 2.2) +
+    `<path d="M26 29 Q32 34 38 29" stroke="${OL}" stroke-width="1.3" fill="none"/><path d="M28 30.4 L29 33 L30 31.4 M34 31.4 L35 33 L36 30.4" fill="#fff"/>`,
+  scorpion: () =>
+    SH +
+    [0, 1, 2]
+      .map(
+        (i) =>
+          `<path d="M${24 - i * 3} ${44 + i * 3} L${10 - i * 2} ${50 + i * 3}" stroke="${OL}" stroke-width="2.6" stroke-linecap="round"/>`,
+      )
+      .join('') +
+    mirror(
+      [0, 1, 2]
+        .map(
+          (i) =>
+            `<path d="M${24 - i * 3} ${44 + i * 3} L${10 - i * 2} ${50 + i * 3}" stroke="${OL}" stroke-width="2.6" stroke-linecap="round"/>`,
+        )
+        .join(''),
+    ) +
+    `<path d="M38 46 C52 44 58 30 52 16 C50 10 44 10 42 14" stroke="${OL}" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M38 46 C52 44 58 30 52 16 C50 10 44 10 42 14" stroke="#d9822b" stroke-width="6.6" fill="none" stroke-linecap="round"/><path d="M42 14 L36 18 L41 19Z" fill="#ff4d5e"${O}/><ellipse cx="32" cy="47" rx="14" ry="9" fill="#d9822b"${O}/><path d="M22 44 Q32 40 42 44 M21 49 Q32 46 43 49" stroke="#8a4a14" stroke-width="1" fill="none"/>` +
+    limb('M20 42 L12 34', '#d9822b', 3.4) +
+    `<path d="M12 34 L4 30 Q4 24 10 25 L8 29 L13 31Z" fill="#e89a3c"${O}/>` +
+    limb('M44 42 L52 36', '#d9822b', 3.4) +
+    `<ellipse cx="32" cy="38" rx="8" ry="6" fill="#e89a3c"${O}/>` +
+    EYE(29, 37, '#ff2f4a', 1.6) +
+    EYE(35, 37, '#ff2f4a', 1.6) +
+    `<path d="M26 32.6 L27 27.6 L29.4 30.6 L32 26.4 L34.6 30.6 L37 27.6 L38 32.6Z" fill="#ffc94d"${O}/>`,
+  troll: () =>
+    SH +
+    limb('M24 50 L22 59', '#566e54', 7) +
+    limb('M40 50 L42 59', '#566e54', 7) +
+    `<ellipse cx="32" cy="40" rx="19" ry="16" fill="#6c8a6a"${O}/><ellipse cx="32" cy="44" rx="11" ry="9" fill="#89a684"/><path d="M14 30 Q20 26 24 30 M42 28 Q47 25 50 29" stroke="#3f6a3a" stroke-width="3" stroke-linecap="round"/><path d="M18 50 L46 50 L44 57 L20 57Z" fill="#5a3a24"${O}/>` +
+    limb('M14 38 L8 52', '#6c8a6a', 6) +
+    limb('M50 38 L54 26', '#6c8a6a', 6) +
+    `<path d="M52 28 L58 4 Q63 3 62 10 L56 29Z" fill="#6a4a2a"${O}/><circle cx="32" cy="20" r="10" fill="#6c8a6a"${O}/><path d="M30 21 Q32 30 36 26" fill="#5f7d5c"${O}/>` +
+    EYE(27.5, 18.5, '#ffd84d', 1.8) +
+    EYE(36.5, 18.5, '#ffd84d', 1.8) +
+    `<path d="M26 26 L25.4 21 L27.6 25.6 M38 26 L38.6 21 L36.4 25.6" fill="#f4f0e0"${O}/><path d="M24 14 L40 14" stroke="${OL}" stroke-width="2"/>`,
+  lich: () => {
+    const d = glowDef('lg2', '#7dff9a', 0.9)
+    return {
+      d,
+      b:
+        `<ellipse cx="32" cy="34" rx="30" ry="30" fill="url(#lg2)" opacity=".5"/>` +
+        SH +
+        `<path d="M22 30 L42 30 L50 58 Q32 62 14 58Z" fill="#3a1f6b"${O}/><path d="M31 30 L33 30 L34 60 L30 60Z" fill="#c86bff"/>` +
+        limb('M24 33 L16 46', '#3a1f6b', 4) +
+        limb('M14 10 L18 60', '#4a3a2a', 2) +
+        `<circle cx="14" cy="9" r="9" fill="url(#lg2)"/><circle cx="14" cy="9" r="4.2" fill="#7dff9a"${O}/><circle cx="32" cy="20" r="10" fill="#ece6d6"${O}/><ellipse cx="28" cy="20" rx="2.8" ry="3.2" fill="#120a18"/><ellipse cx="36" cy="20" rx="2.8" ry="3.2" fill="#120a18"/><circle cx="28" cy="20.4" r="1.3" fill="#7dff9a"/><circle cx="36" cy="20.4" r="1.3" fill="#7dff9a"/><path d="M28 26 H36 M30 25 V27.5 M32 25 V27.5 M34 25 V27.5" stroke="${OL}" stroke-width=".8"/><path d="M23.5 12 L24.6 4 L28.2 8.4 L32 2 L35.8 8.4 L39.4 4 L40.5 12Z" fill="#ffc94d"${O}/><circle cx="32" cy="9" r="1.4" fill="#7dff9a"/>`,
+    }
+  },
+  dragon: () =>
+    SH +
+    WINGS.dragon('#6a1430') +
+    `<path d="M44 52 C56 54 60 46 58 40" stroke="${OL}" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M44 52 C56 54 60 46 58 40" stroke="#b8243a" stroke-width="3.8" fill="none" stroke-linecap="round"/><ellipse cx="34" cy="46" rx="14" ry="11" fill="#b8243a"${O}/><ellipse cx="32" cy="49" rx="8" ry="6" fill="#f0b45a"/>` +
+    limb('M26 54 L25 59', '#b8243a', 4.4) +
+    limb('M40 54 L41 59', '#b8243a', 4.4) +
+    `<path d="M30 38 C26 30 22 26 20 22" stroke="${OL}" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M30 38 C26 30 22 26 20 22" stroke="#b8243a" stroke-width="7.6" fill="none" stroke-linecap="round"/><path d="M10 22 C10 14 26 12 28 20 C29 26 22 28 16 28 L6 27 C3 26 4 22 7 22Z" fill="#c8303f"${O}/><path d="M18 14 L22 4 L24 15Z M24 15 L30 7 L29 18Z" fill="#f4e6c8"${O}/>` +
+    EYE(19, 19, '#ffd84d', 1.9) +
+    `<path d="M5 25 L-1 27 L4 28 L-1 31 L6 29.6" fill="#ff7b3a" stroke="#ffd84d" stroke-width=".7"/><path d="M8 26.6 L9 28.6 L10.2 26.8" fill="#fff"/>`,
+}
+const MON_SRC = {}
+for (const k in MON_SVG) {
+  const r = MON_SVG[k]()
+  MON_SRC[k] = typeof r === 'string' ? uri(r, '-2 0 66 64') : uri(r.b, '-2 0 66 64', r.d)
+}
+
+/* --- items, portal, ui icons (viewBox 0 0 24 24 for icons) --- */
+const ITEM_SRC = {
+  shard: uri(
+    `<circle cx="32" cy="36" r="22" fill="url(#sg)"/><path d="M32 12 L42 30 L32 54 L22 30Z" fill="#4fd8e8"${O}/><path d="M32 12 L32 54 M22 30 H42" stroke="#155a66" stroke-width="1" opacity=".6"/><path d="M32 12 L26 30 L32 30Z" fill="#d6fbff" opacity=".85"/><path d="M44 22 L49 30 L44 40 L39 30Z" fill="#7de6f2"${O}/>`,
+    '0 0 64 64',
+    glowDef('sg', '#4fd8e8', 0.8),
+  ),
+  chest: uri(
+    `<ellipse cx="32" cy="54" rx="18" ry="3" fill="#000" opacity=".35"/><rect x="14" y="30" width="36" height="22" rx="2" fill="#8a4f2a"${O}/><path d="M14 30 Q14 16 32 16 Q50 16 50 30Z" fill="#a8622f"${O}/><path d="M14 30 H50" stroke="${OL}" stroke-width="1.3"/><rect x="20" y="16.6" width="4" height="35.4" fill="#ffc94d"${O}/><rect x="40" y="16.6" width="4" height="35.4" fill="#ffc94d"${O}/><rect x="29" y="27" width="6" height="8" rx="1" fill="#ffc94d"${O}/><circle cx="32" cy="31" r="1.2" fill="${OL}"/>`,
+    '0 0 64 64',
+  ),
+  meat: uri(
+    `<ellipse cx="32" cy="54" rx="14" ry="2.6" fill="#000" opacity=".35"/><path d="M38 34 L50 46" stroke="${OL}" stroke-width="7" stroke-linecap="round"/><path d="M38 34 L50 46" stroke="#f4ecd8" stroke-width="4.6" stroke-linecap="round"/><circle cx="52" cy="45" r="3.4" fill="#f4ecd8"${O}/><circle cx="49" cy="48" r="3.4" fill="#f4ecd8"${O}/><ellipse cx="29" cy="30" rx="15" ry="12" transform="rotate(35 29 30)" fill="#c0603a"${O}/><ellipse cx="25" cy="26" rx="6" ry="3" transform="rotate(35 25 26)" fill="#e88a5a" opacity=".8"/>`,
+    '0 0 64 64',
+  ),
+  potion: uri(
+    `<ellipse cx="32" cy="56" rx="13" ry="2.6" fill="#000" opacity=".35"/><circle cx="32" cy="40" r="22" fill="url(#pg)"/><rect x="27" y="12" width="10" height="12" fill="#cfe7f2"${O}/><rect x="26" y="8" width="12" height="6" rx="2" fill="#8a5a2e"${O}/><circle cx="32" cy="40" r="15" fill="#cfe7f2"${O}/><path d="M18 42 Q32 34 46 42 A14 14 0 0 1 18 42Z" fill="#ff4d6d"/><circle cx="26" cy="34" r="3" fill="#fff" opacity=".7"/>`,
+    '0 0 64 64',
+    glowDef('pg', '#ff4d6d', 0.6),
+  ),
+  altar: uri(
+    `<ellipse cx="32" cy="56" rx="18" ry="3" fill="#000" opacity=".4"/><circle cx="32" cy="24" r="20" fill="url(#ag)"/><path d="M20 54 L22 34 H42 L44 54Z" fill="#5a4a66"${O}/><path d="M24 40 H40 M23 47 H41" stroke="#3a2d45" stroke-width="1.2"/><rect x="16" y="28" width="32" height="7" rx="2" fill="#6f5c80"${O}/><path d="M22 28 Q32 18 42 28Z" fill="#2a1424"${O}/><path d="M25 27 Q32 21 39 27Z" fill="#ff2f4a"/><circle cx="32" cy="16" r="4" fill="#ff4d6d" opacity=".8"/><path d="M28 44 L32 38 L36 44 L32 50Z" fill="#ff4d6d" opacity=".75"/>`,
+    '0 0 64 64',
+    glowDef('ag', '#ff2f4a', 0.7),
+  ),
+  portal: uri(
+    `<ellipse cx="32" cy="34" rx="30" ry="22" fill="url(#ptg)"/><ellipse cx="32" cy="36" rx="22" ry="13" fill="#2a1046"${O}/><ellipse cx="32" cy="36.6" rx="17" ry="9.4" fill="#4a1e7a"/><ellipse cx="32" cy="37" rx="12" ry="6.4" fill="#1a0a2e"/><path d="M20 36 Q32 28 44 36" stroke="#c86bff" stroke-width="1.4" fill="none"/><path d="M24 39 Q32 34 40 39" stroke="#4fd8e8" stroke-width="1.2" fill="none"/><circle cx="32" cy="37" r="2.4" fill="#e8d6ff"/>`,
+    '0 0 64 64',
+    glowDef('ptg', '#c86bff', 0.7),
+  ),
+}
+
 const SLOT_SRC = {
   skull: uri(
     `<circle cx="32" cy="28" r="17" fill="#ece6d6"${O}/><path d="M22 38 H42 L40 48 H24Z" fill="#ece6d6"${O}/><ellipse cx="25.5" cy="28" rx="5" ry="5.6" fill="#1b1124"/><ellipse cx="38.5" cy="28" rx="5" ry="5.6" fill="#1b1124"/><circle cx="25.5" cy="29" r="2" fill="#ff5c8a"/><circle cx="38.5" cy="29" r="2" fill="#ff5c8a"/><path d="M32 33 L29.6 38 H34.4Z" fill="#1b1124"/><path d="M28 42 V48 M32 42 V48 M36 42 V48" stroke="#1b1124" stroke-width="1.2"/>`,
@@ -863,6 +1076,222 @@ const SLOT_SRC = {
   ),
 }
 
+const BIOMES = [
+  {
+    n: 'Склеп',
+    wall: '#5a4876',
+    hi: '#7d6aa0',
+    mortar: '#33284a',
+    top: '#271e38',
+    floor: ['#3a2f52', '#362b4c', '#3e3256'],
+    fm: '#271e3a',
+    acc: '#ff5c8a',
+    deco: 'bones',
+    void: '#0b0812',
+  },
+  {
+    n: 'Изумрудные пещеры',
+    wall: '#376e66',
+    hi: '#58a096',
+    mortar: '#1c4440',
+    top: '#15302d',
+    floor: ['#24443f', '#213f3b', '#284a45'],
+    fm: '#16302c',
+    acc: '#5fe0c0',
+    deco: 'crystal',
+    void: '#06100f',
+  },
+  {
+    n: 'Кровавый собор',
+    wall: '#7a3248',
+    hi: '#ac5072',
+    mortar: '#46182a',
+    top: '#2e111d',
+    floor: ['#48283a', '#432434', '#4f2c3f'],
+    fm: '#2e1522',
+    acc: '#ffc94d',
+    deco: 'rune',
+    void: '#0e0509',
+  },
+  {
+    n: 'Ледяной некрополь',
+    wall: '#4a6f9a',
+    hi: '#80a8d4',
+    mortar: '#27416a',
+    top: '#1b2d46',
+    floor: ['#2e4462', '#2a3f5b', '#334a6a'],
+    fm: '#1d2e46',
+    acc: '#9fe6ff',
+    deco: 'ice',
+    void: '#060b14',
+  },
+  {
+    n: 'Бездна',
+    wall: '#3a2b5a',
+    hi: '#6a4fa0',
+    mortar: '#1f1638',
+    top: '#150e25',
+    floor: ['#241b38', '#211932', '#291f3e'],
+    fm: '#150f24',
+    acc: '#c86bff',
+    deco: 'rune',
+    void: '#05030a',
+  },
+]
+const biomeOf = (f) => BIOMES[Math.floor((f - 1) / 5) % BIOMES.length]
+
+const hash = (x, y, f) => {
+  let h = (x * 374761393 + y * 668265263 + f * 2246822519) >>> 0
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0
+  return (h ^ (h >>> 16)) >>> 0
+}
+function mulberry(a) {
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+const TILEC = {}
+function tiles(b, T, dpr) {
+  const key = b.n + '|' + T + '|' + dpr
+  if (TILEC[key]) return TILEC[key]
+  const mk = (seed, fn) => {
+    const c = document.createElement('canvas')
+    c.width = c.height = Math.ceil(T * dpr)
+    const x = c.getContext('2d')
+    x.scale(dpr, dpr)
+    fn(x, mulberry(seed))
+    return c
+  }
+  const face = [0, 1, 2].map((v) =>
+    mk(11 + v, (x, R) => {
+      x.fillStyle = b.wall
+      x.fillRect(0, 0, T, T)
+      const h = T / 4
+      for (let r = 0; r < 4; r++) {
+        const off = ((r % 2) * T) / 4
+        for (let xx = -off; xx < T; xx += T / 2) {
+          const l = R()
+          if (l < 0.3) {
+            x.fillStyle = l < 0.15 ? b.hi + '55' : '#00000022'
+            x.fillRect(xx + 1, r * h + 1, T / 2 - 2, h - 2)
+          }
+          x.strokeStyle = b.mortar
+          x.lineWidth = 1.2
+          x.strokeRect(xx + 0.6, r * h + 0.6, T / 2 - 1.2, h - 1.2)
+        }
+      }
+      x.fillStyle = b.hi
+      x.fillRect(0, 0, T, Math.max(2, T * 0.07))
+      const g = x.createLinearGradient(0, T * 0.7, 0, T)
+      g.addColorStop(0, '#0000')
+      g.addColorStop(1, '#0006')
+      x.fillStyle = g
+      x.fillRect(0, T * 0.7, T, T * 0.3)
+    }),
+  )
+  const top = mk(5, (x) => {
+    x.fillStyle = b.top
+    x.fillRect(0, 0, T, T)
+    x.strokeStyle = b.mortar
+    x.globalAlpha = 0.6
+    x.lineWidth = 1
+    x.strokeRect(0.5, 0.5, T - 1, T - 1)
+    x.globalAlpha = 0.25
+    x.beginPath()
+    x.moveTo(0, T / 2)
+    x.lineTo(T / 2, 0)
+    x.lineTo(T, T / 2)
+    x.lineTo(T / 2, T)
+    x.closePath()
+    x.stroke()
+  })
+  const floor = [0, 1, 2].map((v) =>
+    mk(31 + v, (x, R) => {
+      x.fillStyle = b.floor[v]
+      x.fillRect(0, 0, T, T)
+      x.strokeStyle = b.fm
+      x.lineWidth = 1.3
+      x.globalAlpha = 0.9
+      x.strokeRect(0.6, 0.6, T / 2 - 0.6, T / 2 - 0.6)
+      x.strokeRect(T / 2, 0.6, T / 2 - 0.6, T / 2 - 0.6)
+      x.strokeRect(0.6, T / 2, T / 2 - 0.6, T / 2 - 0.6)
+      x.strokeRect(T / 2, T / 2, T / 2 - 0.6, T / 2 - 0.6)
+      x.globalAlpha = 1
+      for (let i = 0; i < 5; i++) {
+        x.fillStyle = R() < 0.5 ? '#ffffff0c' : '#0000001a'
+        x.fillRect(R() * T, R() * T, 1.6, 1.6)
+      }
+      if (v === 2) {
+        x.strokeStyle = '#00000040'
+        x.beginPath()
+        x.moveTo(T * 0.2, T * 0.3)
+        x.lineTo(T * 0.4, T * 0.45)
+        x.lineTo(T * 0.35, T * 0.7)
+        x.stroke()
+      }
+    }),
+  )
+  return (TILEC[key] = { face, top, floor })
+}
+function decoDraw(x, b, X, Y, T, t, h) {
+  x.save()
+  if (b.deco === 'bones') {
+    x.strokeStyle = '#e8e0cf'
+    x.globalAlpha = 0.55
+    x.lineWidth = T * 0.06
+    x.lineCap = 'round'
+    x.beginPath()
+    x.moveTo(X + T * 0.3, Y + T * 0.6)
+    x.lineTo(X + T * 0.6, Y + T * 0.72)
+    x.moveTo(X + T * 0.45, Y + T * 0.55)
+    x.lineTo(X + T * 0.5, Y + T * 0.8)
+    x.stroke()
+    x.fillStyle = '#e8e0cf'
+    x.beginPath()
+    x.arc(X + T * 0.7, Y + T * 0.5, T * 0.09, 0, 7)
+    x.fill()
+  } else if (b.deco === 'crystal' || b.deco === 'ice') {
+    const c = b.deco === 'ice' ? '#d6f4ff' : b.acc
+    x.globalAlpha = 0.8 + 0.2 * Math.sin(t / 500 + h)
+    x.fillStyle = c
+    x.shadowColor = c
+    x.shadowBlur = T * 0.3
+    ;[
+      [0.35, 0.75, 0.08, 0.3],
+      [0.55, 0.78, 0.06, 0.22],
+      [0.48, 0.8, 0.05, 0.15],
+    ].forEach(([a, bb, w, hh]) => {
+      x.beginPath()
+      x.moveTo(X + T * (a - w), Y + T * bb)
+      x.lineTo(X + T * a, Y + T * (bb - hh))
+      x.lineTo(X + T * (a + w), Y + T * bb)
+      x.closePath()
+      x.fill()
+    })
+  } else {
+    x.globalAlpha = 0.25 + 0.15 * Math.sin(t / 700 + h)
+    x.strokeStyle = b.acc
+    x.lineWidth = 1.2
+    x.beginPath()
+    x.arc(X + T / 2, Y + T / 2, T * 0.3, 0, 7)
+    x.stroke()
+    x.beginPath()
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5
+      const px = X + T / 2 + Math.cos(a) * T * 0.3,
+        py = Y + T / 2 + Math.sin(a) * T * 0.3
+      i ? x.lineTo(px, py) : x.moveTo(px, py)
+    }
+    x.closePath()
+    x.stroke()
+  }
+  x.restore()
+}
+
 const BY_ID = new Map(SKIN_LIST.map(([id, , , c]) => [id, c]))
 const cache = new Map()
 /** Портрет облика (data URI), кэшируется. */
@@ -880,4 +1309,4 @@ export function skinColors(id) {
   const c = BY_ID.get(id) ?? BY_ID.get('mage')
   return { c1: c.c1, c2: c.c2, aura: c.aura ?? null, eye: c.eye ?? null }
 }
-export { SLOT_SRC }
+export { SLOT_SRC, MON_SRC, ITEM_SRC, BIOMES, biomeOf, tiles, decoDraw, hash }

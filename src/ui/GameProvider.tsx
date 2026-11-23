@@ -18,6 +18,8 @@ export function GameProvider({ children, fallback }: { children: ReactNode; fall
         if (!alive) return s.close()
         s.dispatch({ type: 'tick' })
         setStore(s)
+        // Только для разработки: доступ к хранилищу из консоли и автотестов в браузере.
+        if (import.meta.env.DEV) (window as unknown as { __ql: GameStore }).__ql = s
         // Просим браузер не вычищать данные (iOS чистит хранилище неустановленных сайтов).
         void navigator.storage?.persist?.().catch(() => {})
       } catch (e) {

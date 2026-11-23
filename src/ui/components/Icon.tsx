@@ -27,9 +27,13 @@ export type IconName =
   | 'repeat'
   | 'chest'
   | 'flame'
+  | 'chevron'
+  | 'dot'
 
 const paths: Record<IconName, ReactNode> = {
   check: <path d="M5 12.5l4.2 4.2L19 7" />,
+  chevron: <path d="M6 15l6-6 6 6" />,
+  dot: <circle cx="12" cy="12" r="2.5" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
   heart: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />,

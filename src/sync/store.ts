@@ -1,6 +1,7 @@
 // Хранилище игры на устройстве: журнал событий + локальный забег.
 // Профиль = свёртка журнала от общего начального состояния, поэтому журналы с разных вкладок,
 // устройств и из импорта просто объединяются по id — ничего не теряется и не дублируется.
+import type { Fx } from '../core/dungeon/types.ts'
 import { apply, type Action, type Result } from '../core/engine.ts'
 import { compareEvents, mergeEvents } from '../core/events.ts'
 import { createRng } from '../core/rng.ts'
@@ -71,6 +72,7 @@ export class GameStore {
   private ids: Set<string>
   private meta: Meta
   private listeners = new Set<() => void>()
+  private fxListeners = new Set<(fx: readonly Fx[], state: GameState) => void>()
   private seq = 0
   private runSave: ReturnType<typeof setTimeout> | null = null
   private storage: Storage
@@ -103,6 +105,12 @@ export class GameStore {
     return () => this.listeners.delete(fn)
   }
   getState = () => this.state
+
+  /** Визуальные события действия (для слоя графики): приходят до уведомления подписчиков состояния. */
+  onFx = (fn: (fx: readonly Fx[], state: GameState) => void) => {
+    this.fxListeners.add(fn)
+    return () => this.fxListeners.delete(fn)
+  }
 
   private emit() {
     for (const fn of this.listeners) fn()
@@ -138,6 +146,7 @@ export class GameStore {
       this.storage.addEvents(res.events).catch((e) => this.fail(e))
       this.saveMeta(0)
     } else if (runChanged) this.saveMeta(1500)
+    if (res.fx.length) for (const fn of this.fxListeners) fn(res.fx, this.state)
     if (res.events.length || runChanged) this.emit()
     return res
   }

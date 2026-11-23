@@ -4,15 +4,26 @@ import { floorsOpen } from '../../core/dungeon/run.ts'
 import { formatBig } from '../../core/format.ts'
 import { Amt } from '../components/bits.tsx'
 import { Icon } from '../components/Icon.tsx'
-import { useProfile } from '../useGame.ts'
+import { useToasts } from '../components/useToasts.ts'
+import { useGame } from '../useGame.ts'
+import { RunView } from './RunView.tsx'
 
 export function Dungeon() {
-  const p = useProfile()
+  const { state, dispatch } = useGame()
+  const { toast } = useToasts()
+  const p = state.profile
   const floors = floorsOpen(p.checkpoint)
   const [pick, setPick] = useState<number | null>(null)
   const start = pick !== null && floors.includes(pick) ? pick : floors[floors.length - 1]!
   // Длинный список чекпоинтов: показываем последние, остальное — прокруткой.
   const shown = floors.slice(-24)
+
+  if (state.run) return <RunView />
+
+  const enter = () => {
+    const res = dispatch({ type: 'run.start', floor: start })
+    if (res.error) toast(res.error, { tone: 'error' })
+  }
 
   return (
     <>
@@ -36,12 +47,17 @@ export function Dungeon() {
               </button>
             ))}
           </div>
-          <button className="btn-pearl wide" disabled>
+          <button className="btn-pearl wide" disabled={p.torches < 1} onClick={enter}>
             Войти с этажа {formatBig(start)} · <Amt cur="torch" n={1} />
           </button>
           <p className="note">
-            Игровое окно подземелья (Phaser) — следующий этап. Факелы копятся:{' '}
-            <Amt cur="torch" n={p.torches} />
+            {p.torches < 1 ? (
+              'Факелы дают задачи. Закрой дело — и в бой.'
+            ) : (
+              <>
+                Факелов: <Amt cur="torch" n={p.torches} /> · зелий: {p.potions}
+              </>
+            )}
           </p>
         </div>
       </section>

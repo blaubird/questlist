@@ -7,7 +7,7 @@ import { Meter, Portrait } from './components/bits.tsx'
 import { Icon, type IconName } from './components/Icon.tsx'
 import { ToastProvider } from './components/Toasts.tsx'
 import { GameProvider } from './GameProvider.tsx'
-import { useProfile } from './useGame.ts'
+import { useGame, useProfile } from './useGame.ts'
 import { Casino } from './screens/Casino.tsx'
 import { Dungeon } from './screens/Dungeon.tsx'
 import { Hero } from './screens/Hero.tsx'
@@ -100,6 +100,7 @@ function UpdateToast() {
 function Shell() {
   const [tab, setTab] = useState<Tab>(readTab)
   const current = TABS.find((t) => t.id === tab) ?? TABS[0]!
+  const inRun = useGame().state.run !== null && tab === 'dungeon'
 
   useEffect(() => {
     try {
@@ -122,7 +123,7 @@ function Shell() {
   }, [])
 
   return (
-    <div className="shell">
+    <div className={`shell ${inRun ? 'shell-run' : ''}`}>
       <aside className="sidebar">
         <div className="brand">
           Квест<span>·</span>лист
@@ -153,7 +154,7 @@ function Shell() {
 
       <main className="content" key={tab}>
         {current.view()}
-        <p className="build">сборка {__BUILD__}</p>
+        {!inRun && <p className="build">сборка {__BUILD__}</p>}
       </main>
 
       <nav className="tabbar">
