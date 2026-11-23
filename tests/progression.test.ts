@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { MON_GROWTH, SCALE_FROM } from '../src/core/config.ts'
+import {
+  ENH_OVER,
+  ENH_SOFT,
+  LVL_MULT,
+  MON_GROWTH,
+  SCALE_FROM,
+  XP_GROWTH,
+  XP_SOFT,
+} from '../src/core/config.ts'
 import { genFloor } from '../src/core/dungeon/gen.ts'
 import { monScale } from '../src/core/dungeon/scale.ts'
 import { betOptions } from '../src/core/engine.ts'
-import { blessCost, enhCost, heroStats, pickHero, soulsFor } from '../src/core/hero.ts'
+import { addXp, blessCost, enhCost, heroStats, pickHero, soulsFor, xpNeed } from '../src/core/hero.ts'
 import { createRng } from '../src/core/rng.ts'
 import { freshProfile } from '../src/core/state.ts'
 import { DAY, world } from './helpers.ts'
@@ -24,12 +32,12 @@ describe('масштаб', () => {
     }
   })
 
-  it('заточка выше +25 стоит только осколки и растёт экспоненциально', () => {
-    expect(enhCost(true, 24).gold).toBeGreaterThan(0)
-    const a = enhCost(true, 25)
-    const b = enhCost(true, 26)
+  it('заточка выше мягкого потолка стоит только осколки и растёт экспоненциально', () => {
+    expect(enhCost(true, ENH_SOFT - 1).gold).toBeGreaterThan(0)
+    const a = enhCost(true, ENH_SOFT)
+    const b = enhCost(true, ENH_SOFT + 1)
     expect(a.gold).toBe(0)
-    expect(b.shards / a.shards).toBeCloseTo(1.08, 2)
+    expect(b.shards / a.shards).toBeCloseTo(ENH_OVER.costGrowth, 2)
   })
 
   it('благословения: цена линейная, эффект множителем', () => {
@@ -49,7 +57,24 @@ describe('масштаб', () => {
       prev = s
     }
     expect(soulsFor(21)).toBe(0)
-    expect(soulsFor(31)).toBe(3)
+  })
+
+  it('выше мягких потолков линейные прибавки заморожены — растут только множители', () => {
+    const p = { ...freshProfile(DAY), lvl: XP_SOFT, wEnh: ENH_SOFT }
+    const a = heroStats(pickHero(p))
+    const b = heroStats(pickHero({ ...p, lvl: XP_SOFT + 100, wEnh: ENH_SOFT + 10 }))
+    expect(b.atk / a.atk).toBeCloseTo(LVL_MULT ** 100 * ENH_OVER.mult ** 10, 6)
+    expect(b.maxHp / a.maxHp).toBeCloseTo(LVL_MULT ** 100, 2)
+  })
+
+  it('порог опыта выше XP_SOFT растёт экспоненциально, addXp не зависает на огромном опыте', () => {
+    expect(xpNeed(XP_SOFT + 1) / xpNeed(XP_SOFT)).toBeCloseTo(XP_GROWTH, 3)
+    const t = performance.now()
+    const r = addXp(1, 0, 1e30)
+    expect(r.lvl).toBeGreaterThan(1000)
+    expect(r.lvl).toBeLessThan(5000)
+    expect(performance.now() - t).toBeLessThan(200)
+    expect(soulsFor(31)).toBe(2)
   })
 
   it('благословения закрыты до чекпоинта 21', () => {

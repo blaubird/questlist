@@ -33,6 +33,8 @@ export interface DayRow {
 export interface BotOptions {
   /** Выходить с добычей на этой глубине (множитель добычи уже максимальный). */
   leaveDepth?: number
+  /** Вызывается после каждого дня (прогресс долгих прогонов). */
+  onDay?: (row: DayRow, steps: number) => void
 }
 
 const DIRS = [
@@ -175,6 +177,7 @@ export function simulate(days: number, seed = 1, opt: BotOptions = {}): DayRow[]
     let deaths = 0
     let maxf = 0
     let runs = 0
+    let daySteps = 0
     while (state.profile.torches > 0) {
       const fo = floorsOpen(state.profile.checkpoint)
       const start = fo[Math.max(0, fo.length - 1 - startDrop)]!
@@ -184,6 +187,7 @@ export function simulate(days: number, seed = 1, opt: BotOptions = {}): DayRow[]
       for (let steps = 0; state.run && steps < 4000; steps++) {
         const r: Run = state.run
         now += 1000
+        daySteps++
         if (r.over === 'dead') {
           deaths++
           maxf = Math.max(maxf, r.f)
@@ -247,6 +251,7 @@ export function simulate(days: number, seed = 1, opt: BotOptions = {}): DayRow[]
       souls: p.souls,
       bless: p.blessAtk + p.blessVit + p.blessLoot,
     })
+    opt.onDay?.(out[out.length - 1]!, daySteps)
   }
   return out
 }

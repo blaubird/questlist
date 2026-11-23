@@ -27,3 +27,21 @@ describe('бот баланса: ранняя игра как в прототи�
     for (const r of runs) expect(r[20]!.scrolls).toBeLessThan(15)
   })
 }, 60_000)
+
+describe('бот баланса: поздняя игра без стен и без снежного кома', () => {
+  const rows = simulate(90, 1)
+  const day = (d: number) => rows[d - 1]!
+
+  it('уровень ~1000 к третьему месяцу', () => {
+    expect(day(90).lvl).toBeGreaterThan(700)
+    expect(day(90).lvl).toBeLessThan(2000)
+  })
+  it('нет стен: чекпоинт растёт каждые 10 дней после 30-го', () => {
+    for (let d = 40; d <= 90; d += 10) expect(day(d).cp).toBeGreaterThan(day(d - 10).cp)
+  })
+  it('нет снежного кома: герой всё ещё гибнет, темп ниже потолка забегов', () => {
+    const late = rows.slice(60)
+    expect(late.reduce((s, r) => s + r.deaths, 0)).toBeGreaterThan(30)
+    for (let i = 61; i < 90; i++) expect(rows[i]!.cp - rows[i - 1]!.cp).toBeLessThan(25)
+  })
+}, 120_000)

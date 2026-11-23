@@ -14,13 +14,17 @@ import {
   HP_PER_LVL,
   SCALE_FROM,
   SOULS,
+  LVL_MULT,
   WEAPONS,
+  XP_GROWTH,
   XP_NEED_K,
+  XP_SOFT,
   type BlessTrack,
   type GearTier,
 } from './config.ts'
 
-export const xpNeed = (lvl: number): number => Math.round(XP_NEED_K * lvl * lvl)
+export const xpNeed = (lvl: number): number =>
+  Math.round(XP_NEED_K * Math.min(lvl, XP_SOFT) ** 2 * XP_GROWTH ** Math.max(0, lvl - XP_SOFT))
 
 /** Прибавляет опыт: возвращает новый уровень и остаток опыта. */
 export function addXp(lvl: number, xp: number, gain: number): { lvl: number; xp: number } {
@@ -73,12 +77,15 @@ const overEnh = (n: number) => ENH_OVER.mult ** Math.max(0, n - ENH_SOFT)
 export const soulMult = (souls: number) => 1 + SOULS.perSoul * souls
 
 export function heroStats(h: HeroLike): HeroStats {
-  const soul = soulMult(h.souls)
+  const soul = soulMult(h.souls) * LVL_MULT ** Math.max(0, h.lvl - XP_SOFT)
   const vit = BLESS.mult ** h.blessVit * overEnh(h.aEnh) * soul
-  const baseAtk = ATK_BASE + Math.floor((h.lvl - 1) / ATK_LVL_DIV) + weaponTier(h.weapon).value + h.wEnh
-  const baseDef = Math.floor((h.lvl - 1) / DEF_LVL_DIV) + armorTier(h.armor).value + h.aEnh
+  // Линейные прибавки прототипа — только до мягких потолков; дальше рост идёт множителями.
+  const lvl = Math.min(h.lvl, XP_SOFT)
+  const baseAtk =
+    ATK_BASE + Math.floor((lvl - 1) / ATK_LVL_DIV) + weaponTier(h.weapon).value + Math.min(h.wEnh, ENH_SOFT)
+  const baseDef = Math.floor((lvl - 1) / DEF_LVL_DIV) + armorTier(h.armor).value + Math.min(h.aEnh, ENH_SOFT)
   return {
-    maxHp: Math.round((HP_BASE + HP_PER_LVL * (h.lvl - 1)) * vit),
+    maxHp: Math.round((HP_BASE + HP_PER_LVL * (lvl - 1)) * vit),
     atk: baseAtk * BLESS.mult ** h.blessAtk * overEnh(h.wEnh) * soul,
     def: baseDef * vit,
   }
@@ -102,6 +109,4 @@ export const blessKey = (t: BlessTrack) => BLESS_KEYS[t]
 
 /** Всего душ за чекпоинт: только за рекорды после ранней игры (чекпоинт > SCALE_FROM + 1). */
 export const soulsFor = (checkpoint: number): number =>
-  checkpoint <= SCALE_FROM + 1
-    ? 0
-    : Math.floor(((checkpoint - SCALE_FROM - 1) / CHECKPOINT_STEP) ** SOULS.pow)
+  checkpoint <= SCALE_FROM + 1 ? 0 : Math.floor((checkpoint - SCALE_FROM - 1) / CHECKPOINT_STEP)

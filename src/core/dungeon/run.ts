@@ -14,6 +14,7 @@ import {
   MAP_H,
   MAP_W,
   MEAT_HEAL,
+  MON_MIN_DMG,
   MON_MISS,
   POTION_FULL_SHARDS,
   POTION_HEAL,
@@ -38,6 +39,18 @@ const DIRS = [
 
 export const greed = (depth: number): number => Math.min(GREED_MAX, 1 + GREED_PER_DEPTH * depth)
 export const runStats = (r: Run) => heroStats(r.hero)
+
+/** Копия забега для чистого apply: всё изменяемое копируется, строки карты неизменяемы и делятся. */
+export const cloneRun = (r: Run): Run => ({
+  ...r,
+  hero: { ...r.hero },
+  stairs: [r.stairs[0], r.stairs[1]],
+  mons: r.mons.map((m) => ({ ...m })),
+  items: r.items.map((i) => ({ ...i })),
+  seen: r.seen.slice(),
+  prompt: r.prompt && { ...r.prompt },
+  log: r.log.slice(),
+})
 
 /** Осколки с учётом глубины, Удачи и душ. */
 const loot = (r: Run, base: number) => Math.max(1, Math.round(base * lootScale(r.f) * lootMult(r.hero)))
@@ -212,7 +225,8 @@ function monstersTurn(r: Run, vis: Uint8Array, rng: Rng, fx: Fx[]) {
         fx.push({ t: 'miss', x: r.px, y: r.py })
         continue
       }
-      const d = Math.max(1, Math.round(m.atk * rng.uniform(HIT_SPREAD[0], HIT_SPREAD[1])) - def)
+      const raw = Math.round(m.atk * rng.uniform(HIT_SPREAD[0], HIT_SPREAD[1]))
+      const d = Math.max(1, Math.floor(raw * MON_MIN_DMG), raw - def)
       r.hp -= d
       say(r, `${m.name} бьёт тебя: −${d}`)
       fx.push({ t: 'dmg', x: r.px, y: r.py, amount: d, kind: 'hurt' }, { t: 'shake' })

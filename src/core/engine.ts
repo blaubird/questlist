@@ -19,6 +19,7 @@ import {
   type Difficulty,
 } from './config.ts'
 import {
+  cloneRun,
   floorsOpen,
   greed,
   runAltar,
@@ -307,7 +308,7 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
     default: {
       const r0 = state.run
       if (!r0) return fail('Нет забега')
-      const r = structuredClone(r0)
+      const r = cloneRun(r0)
       let fx: Fx[]
       switch (action.type) {
         case 'run.step':

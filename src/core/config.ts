@@ -169,13 +169,21 @@ export const CHEST_ODDS: readonly (readonly [Rarity, number])[] = [
 /** До этого этажа — баланс прототипа; дальше включается экспоненциальный рост. */
 export const SCALE_FROM = 20
 /** Рост монстров за этаж после SCALE_FROM. */
-export const MON_GROWTH = { hp: 1.08, atk: 1.07, xp: 1.08 } as const
+export const MON_GROWTH = { hp: 1.0775, atk: 1.075, xp: 1.08 } as const
 /** Рост добычи осколков за этаж после SCALE_FROM. */
 export const LOOT_GROWTH = 1.08
 
+/** Уровни выше XP_SOFT: порог опыта растёт ×XP_GROWTH за уровень (уровень идёт вровень с глубиной,
+ *  а не улетает от экспоненциального опыта), каждый уровень даёт атаку и здоровье ×LVL_MULT. */
+export const XP_SOFT = 30
+export const XP_GROWTH = 1.035
+export const LVL_MULT = 1.0035
+/** Минимальный урон монстра — доля удара (защита не даёт бессмертия при больших числах). */
+export const MON_MIN_DMG = 0.1
+
 /** Заточка выше мягкого потолка: только осколки, эффект множителем. */
-export const ENH_SOFT = 25
-export const ENH_OVER = { mult: 1.05, costGrowth: 1.08 } as const
+export const ENH_SOFT = 10
+export const ENH_OVER = { mult: 1.06, costGrowth: 1.08 } as const
 
 /** Благословения за золото: открываются с чекпоинта BLESS.minCheckpoint. */
 export type BlessTrack = 'atk' | 'vit' | 'loot'
@@ -186,14 +194,13 @@ export const BLESS = {
   minCheckpoint: 21,
 } as const
 
-/** Души: начисляются сами за рекорд чекпоинта, навсегда. Без сбросов. */
+/** Души: 1 за каждый новый чекпоинт после 21-го, навсегда, без сбросов.
+ *  Линейно: степенной рост душ перекрывал дефицит силы и давал снежный ком (проверено ботом). */
 export const SOULS = {
-  /** души = floor(((checkpoint − 21) / 5) ^ pow) — только поздняя игра */
-  pow: 1.6,
   /** сила × (1 + perSoul · души) */
-  perSoul: 0.1,
+  perSoul: 0.02,
   /** осколки и опыт × (1 + lootPerSoul · души) */
-  lootPerSoul: 0.05,
+  lootPerSoul: 0.02,
 } as const
 
 /** Ставки казино — доли баланса (минимум — первая ставка BETS). */
