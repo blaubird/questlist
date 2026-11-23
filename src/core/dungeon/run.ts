@@ -1,6 +1,8 @@
 // Забег: ходы героя и монстров. Все функции получают копию забега и меняют её; случайность — из run.rng.
 import {
+  AFFIX,
   ALTAR,
+  BOSS_ENRAGE,
   BOSS_SCROLL_CHANCE,
   CHECKPOINT_STEP,
   CRIT_CHANCE,
@@ -12,6 +14,7 @@ import {
   HIT_SPREAD,
   LOOT,
   MAP_H,
+  MONSTERS,
   MAP_W,
   MEAT_HEAL,
   MON_MIN_DMG,
@@ -25,7 +28,7 @@ import {
 import { addXp, heroStats, lootMult } from '../hero.ts'
 import { createRng, type Rng } from '../rng.ts'
 import { computeVisible, isWall } from './fov.ts'
-import { genFloor } from './gen.ts'
+import { genFloor, modMults, monster } from './gen.ts'
 import { lootScale } from './scale.ts'
 import type { Fx, Monster, Run, RunHero } from './types.ts'
 
@@ -53,7 +56,8 @@ export const cloneRun = (r: Run): Run => ({
 })
 
 /** Осколки с учётом глубины, Удачи и душ. */
-const loot = (r: Run, base: number) => Math.max(1, Math.round(base * lootScale(r.f) * lootMult(r.hero)))
+const loot = (r: Run, base: number) =>
+  Math.max(1, Math.round(base * lootScale(r.f) * lootMult(r.hero) * modMults(r.mod).loot))
 
 /** Доступные стартовые этажи: 1, 6, 11, … до чекпоинта. */
 export function floorsOpen(checkpoint: number): number[] {
@@ -158,6 +162,10 @@ function kill(r: Run, m: Monster, rng: Rng, fx: Fx[]) {
     say(r, 'Свиток призыва!')
     fx.push({ t: 'loot', x: m.x, y: m.y, amount: 1, kind: 'scroll' })
   }
+  if (m.affix === 'explosive' && Math.abs(m.x - r.px) <= 1 && Math.abs(m.y - r.py) <= 1 && !r.over) {
+    fx.push({ t: 'boom', x: m.x, y: m.y }, { t: 'shake' })
+    hurtHero(r, m.atk * AFFIX.explosiveMult, `${m.name} взрывается`, fx)
+  }
   if (m.boss) {
     r.bossDead = true
     const a = loot(r, 5 + r.f)
@@ -168,10 +176,53 @@ function kill(r: Run, m: Monster, rng: Rng, fx: Fx[]) {
 }
 
 function hit(r: Run, m: Monster, dmg: number, kind: 'hit' | 'crit' | 'whirl', rng: Rng, fx: Fx[]) {
-  m.hp -= dmg
   m.awake = true
+  if ((m.shield ?? 0) > 0) {
+    m.shield = (m.shield ?? 0) - 1
+    say(r, `${m.name}: щит поглотил удар`)
+    fx.push({ t: 'block', x: m.x, y: m.y })
+    return
+  }
+  m.hp -= dmg
   fx.push({ t: 'dmg', x: m.x, y: m.y, amount: dmg, kind })
-  if (m.hp <= 0) kill(r, m, rng, fx)
+  if (m.hp <= 0) return kill(r, m, rng, fx)
+  if (m.boss && !m.enraged && r.f >= BOSS_ENRAGE.fromFloor && m.hp <= m.mhp * BOSS_ENRAGE.at)
+    enrage(r, m, rng, fx)
+}
+
+/** Ярость босса: атака сильнее, рядом появляются помощники. */
+function enrage(r: Run, m: Monster, rng: Rng, fx: Fx[]) {
+  m.enraged = true
+  m.atk = Math.round(m.atk * BOSS_ENRAGE.atk * 10) / 10
+  fx.push({ t: 'enrage', id: m.id }, { t: 'shake' })
+  say(r, `${m.name} в ярости и зовёт свиту!`)
+  const pool = MONSTERS.filter((d) => d.minFloor <= r.f)
+  let n = 0
+  for (const [dx, dy] of [...DIRS, [1, 1], [-1, -1], [1, -1], [-1, 1]] as const) {
+    if (n >= BOSS_ENRAGE.minions) break
+    const x = m.x + dx
+    const y = m.y + dy
+    if (isWall(r.map, x, y) || (x === r.px && y === r.py) || r.mons.some((o) => o.x === x && o.y === y))
+      continue
+    const mi = monster(r.f, rng.pick(pool), x, y, rng, () => r.nextId++, r.mod ?? null, false)
+    mi.awake = true
+    r.mons.push(mi)
+    n++
+  }
+}
+
+/** Урон герою по правилам боя: защита вычитается, но не меньше доли удара. */
+function hurtHero(r: Run, raw0: number, who: string, fx: Fx[]): number {
+  const raw = Math.round(raw0)
+  const d = Math.max(1, Math.floor(raw * MON_MIN_DMG), raw - runStats(r).def)
+  r.hp -= d
+  say(r, `${who}: −${d}`)
+  fx.push({ t: 'dmg', x: r.px, y: r.py, amount: d, kind: 'hurt' })
+  if (r.hp <= 0) {
+    r.hp = 0
+    r.over = 'dead'
+  }
+  return d
 }
 
 function heroAttack(r: Run, m: Monster, rng: Rng, fx: Fx[]) {
@@ -189,7 +240,7 @@ function pickup(r: Run, fx: Fx[]) {
   const it = r.items.splice(i, 1)[0]!
   const max = runStats(r).maxHp
   if (it.kind === 'shard' || it.kind === 'chest') {
-    const a = Math.round(it.amount * lootMult(r.hero))
+    const a = Math.round(it.amount * lootMult(r.hero) * modMults(r.mod).loot)
     r.shards += a
     say(r, `${it.kind === 'chest' ? 'Сундук' : 'Осколки'}: +${a}`)
     fx.push({ t: 'loot', x: r.px, y: r.py, amount: a, kind: 'shard' })
@@ -212,53 +263,57 @@ function pickup(r: Run, fx: Fx[]) {
 }
 
 function monstersTurn(r: Run, vis: Uint8Array, rng: Rng, fx: Fx[]) {
-  const def = runStats(r).def
-  for (const m of r.mons) {
+  for (const m of [...r.mons]) {
     if (r.over) break
+    if (!r.mons.includes(m)) continue
     if (!m.awake && vis[m.y * MAP_W + m.x]) m.awake = true
     if (!m.awake) continue
-    const dist = Math.abs(m.x - r.px) + Math.abs(m.y - r.py)
-    if (dist === 1) {
-      fx.push({ t: 'attack', who: m.id, dx: r.px - m.x, dy: r.py - m.y })
-      if (rng.chance(MON_MISS)) {
-        say(r, `${m.name} промахивается`)
-        fx.push({ t: 'miss', x: r.px, y: r.py })
-        continue
-      }
-      const raw = Math.round(m.atk * rng.uniform(HIT_SPREAD[0], HIT_SPREAD[1]))
-      const d = Math.max(1, Math.floor(raw * MON_MIN_DMG), raw - def)
-      r.hp -= d
-      say(r, `${m.name} бьёт тебя: −${d}`)
-      fx.push({ t: 'dmg', x: r.px, y: r.py, amount: d, kind: 'hurt' }, { t: 'shake' })
-      if (r.hp <= 0) {
-        r.hp = 0
-        r.over = 'dead'
-      }
-      continue
+    // Быстрый ходит дважды, но бьёт один раз за ход.
+    const acts = m.affix === 'swift' ? 2 : 1
+    for (let a = 0; a < acts && !r.over; a++) if (monsterAct(r, m, rng, fx) === 'attack') break
+  }
+}
+
+function monsterAct(r: Run, m: Monster, rng: Rng, fx: Fx[]): 'attack' | 'move' | 'idle' {
+  const dist = Math.abs(m.x - r.px) + Math.abs(m.y - r.py)
+  if (dist === 1) {
+    fx.push({ t: 'attack', who: m.id, dx: r.px - m.x, dy: r.py - m.y })
+    if (rng.chance(MON_MISS)) {
+      say(r, `${m.name} промахивается`)
+      fx.push({ t: 'miss', x: r.px, y: r.py })
+      return 'attack'
     }
-    if (dist > WAKE_FORGET_DIST) {
-      m.awake = false
-      continue
+    const d = hurtHero(r, m.atk * rng.uniform(HIT_SPREAD[0], HIT_SPREAD[1]), `${m.name} бьёт тебя`, fx)
+    fx.push({ t: 'shake' })
+    if (m.affix === 'vampire' && m.hp < m.mhp) {
+      const h = Math.max(1, Math.round(d * AFFIX.vampireHeal))
+      m.hp = Math.min(m.mhp, m.hp + h)
+      fx.push({ t: 'heal', x: m.x, y: m.y, amount: h })
     }
-    let best: [number, number] | null = null
-    let bestD = dist
-    for (const [dx, dy] of DIRS) {
-      const x = m.x + dx
-      const y = m.y + dy
-      if (isWall(r.map, x, y) || (x === r.px && y === r.py)) continue
-      if (r.mons.some((o) => o !== m && o.x === x && o.y === y)) continue
-      const d = Math.abs(x - r.px) + Math.abs(y - r.py)
-      if (d < bestD) {
-        bestD = d
-        best = [x, y]
-      }
-    }
-    if (best) {
-      fx.push({ t: 'move', who: m.id, fx: m.x, fy: m.y, x: best[0], y: best[1] })
-      m.x = best[0]
-      m.y = best[1]
+    return 'attack'
+  }
+  if (dist > WAKE_FORGET_DIST) {
+    m.awake = false
+    return 'idle'
+  }
+  let best: [number, number] | null = null
+  let bestD = dist
+  for (const [dx, dy] of DIRS) {
+    const x = m.x + dx
+    const y = m.y + dy
+    if (isWall(r.map, x, y) || (x === r.px && y === r.py)) continue
+    if (r.mons.some((o) => o !== m && o.x === x && o.y === y)) continue
+    const d = Math.abs(x - r.px) + Math.abs(y - r.py)
+    if (d < bestD) {
+      bestD = d
+      best = [x, y]
     }
   }
+  if (!best) return 'idle'
+  fx.push({ t: 'move', who: m.id, fx: m.x, fy: m.y, x: best[0], y: best[1] })
+  m.x = best[0]
+  m.y = best[1]
+  return 'move'
 }
 
 function endTurn(r: Run, rng: Rng, fx: Fx[]) {

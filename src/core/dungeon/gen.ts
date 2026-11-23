@@ -1,6 +1,9 @@
 // Генерация этажа. Детерминирована от rng.
 import {
+  AFFIX,
   ALTAR,
+  FLOOR_MOD,
+  SCALE_FROM,
   BOSS_CYCLE_MULT,
   BOSS_EVERY,
   BOSS_HP_PER_FLOOR,
@@ -21,6 +24,7 @@ import {
   ROOMS_MAX,
   ROOMS_MIN,
   SPAWN_MIN_DIST,
+  type FloorMod,
   type MonsterDef,
 } from '../config.ts'
 import { lootScale, monScale, over } from './scale.ts'
@@ -107,30 +111,20 @@ export function genFloor(f: number, rng: Rng, nextId: () => number): Floor {
     return null
   }
 
+  // Модификатор этажа — бросок только с FLOOR_MOD.fromFloor (ранние этажи генерируются как раньше).
+  const mod: FloorMod | null =
+    f >= FLOOR_MOD.fromFloor && rng.chance(FLOOR_MOD.chance) ? rng.pick(FLOOR_MOD.list) : null
+
   // Монстры
-  const { hp: hm, atk: am, xp: xm } = monScale(f)
+  const mm = modMults(mod)
+  const make = (m: MonsterDef, x: number, y: number): Monster => monster(f, m, x, y, rng, nextId, mod)
   const pool = MONSTERS.filter((m) => m.minFloor <= f)
   const deep = pool.slice(-LEADER_DEEP_POOL)
-  const make = (m: MonsterDef, x: number, y: number): Monster => {
-    const elite = f >= ELITE.fromFloor && rng.chance(ELITE.chance)
-    const hp = Math.round(m.hp * hm * (elite ? ELITE.hp : 1))
-    return {
-      id: nextId(),
-      kind: m.id,
-      name: (elite ? 'Элита · ' : '') + m.name,
-      hp,
-      mhp: hp,
-      atk: round1(m.atk * am * (elite ? ELITE.atk : 1)),
-      xp: Math.round(m.xp * xm * (elite ? ELITE.xp : 1)),
-      x,
-      y,
-      awake: false,
-      boss: false,
-      elite,
-    }
-  }
   const mons: Monster[] = []
-  const count = Math.min(MON_COUNT.max, MON_COUNT.base + Math.floor(f * MON_COUNT.perFloor))
+  const count = Math.min(
+    Math.round(MON_COUNT.max * mm.count),
+    Math.round((MON_COUNT.base + Math.floor(f * MON_COUNT.perFloor)) * mm.count),
+  )
   for (let guard = 0; mons.length < count && guard < 60; guard++) {
     const room = otherRoom()
     const k = Math.min(count - mons.length, rng.int(1, PACK_MAX))
@@ -203,5 +197,50 @@ export function genFloor(f: number, rng: Rng, nextId: () => number): Floor {
     if (p) items.push({ x: p[0], y: p[1], kind: 'altar', amount: 0 })
   }
 
-  return { map: grid.map((r) => r.join('')), px, py, stairs, mons, items, bossDead: !bossFloor }
+  return { map: grid.map((r) => r.join('')), px, py, stairs, mons, items, bossDead: !bossFloor, mod }
+}
+
+/** Множители модификатора этажа (1, если модификатора нет). */
+export function modMults(mod: FloorMod | null | undefined) {
+  return {
+    count: mod === 'horde' ? FLOOR_MOD.horde.count : 1,
+    loot: mod === 'horde' ? FLOOR_MOD.horde.loot : mod === 'rich' ? FLOOR_MOD.rich.loot : 1,
+    hp: mod === 'rich' ? FLOOR_MOD.rich.hp : 1,
+    atk: mod === 'frenzy' ? FLOOR_MOD.frenzy.atk : 1,
+    xp: mod === 'frenzy' ? FLOOR_MOD.frenzy.xp : 1,
+  }
+}
+
+/** Обычный монстр этажа f (элита — по шансу; свойство элиты — только глубже SCALE_FROM). */
+export function monster(
+  f: number,
+  m: MonsterDef,
+  x: number,
+  y: number,
+  rng: Rng,
+  nextId: () => number,
+  mod: FloorMod | null = null,
+  canElite = true,
+): Monster {
+  const { hp: hm, atk: am, xp: xm } = monScale(f)
+  const mm = modMults(mod)
+  const elite = canElite && f >= ELITE.fromFloor && rng.chance(ELITE.chance)
+  const affix = elite && f >= AFFIX.fromFloor && f > SCALE_FROM ? rng.pick(AFFIX.list) : null
+  const hp = Math.round(m.hp * hm * mm.hp * (elite ? ELITE.hp : 1))
+  return {
+    id: nextId(),
+    kind: m.id,
+    name: (elite ? 'Элита · ' : '') + m.name + (affix ? ` (${AFFIX.name[affix]})` : ''),
+    hp,
+    mhp: hp,
+    atk: round1(m.atk * am * mm.atk * (elite ? ELITE.atk : 1)),
+    xp: Math.round(m.xp * xm * mm.xp * (elite ? ELITE.xp : 1)),
+    x,
+    y,
+    awake: false,
+    boss: false,
+    elite,
+    affix,
+    shield: affix === 'shield' ? AFFIX.shieldCharges : 0,
+  }
 }

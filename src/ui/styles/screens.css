@@ -1197,3 +1197,20 @@ details summary {
     display: none;
   }
 }
+.hud-mod {
+  justify-self: start;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: #05030ab3;
+}
+.mod-horde {
+  color: #ff8fa3;
+}
+.mod-rich {
+  color: var(--c-gold);
+}
+.mod-frenzy {
+  color: var(--c-torch);
+}

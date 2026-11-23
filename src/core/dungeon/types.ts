@@ -1,4 +1,4 @@
-import type { BossId, MonsterId } from '../config.ts'
+import type { Affix, BossId, FloorMod, MonsterId } from '../config.ts'
 import type { HeroLike } from '../hero.ts'
 
 export interface Monster {
@@ -15,6 +15,12 @@ export interface Monster {
   awake: boolean
   boss: boolean
   elite: boolean
+  /** Свойство элиты (глубже 20-го этажа). В старых сохранениях поля нет — считаем null. */
+  affix?: Affix | null
+  /** Сколько ударов ещё поглотит щит. */
+  shield?: number
+  /** Босс в ярости (уже призвал помощников). */
+  enraged?: boolean
 }
 
 export type ItemKind = 'shard' | 'chest' | 'meat' | 'potion' | 'altar'
@@ -35,6 +41,8 @@ export interface Floor {
   mons: Monster[]
   items: Item[]
   bossDead: boolean
+  /** Модификатор этажа (с 26-го): орда, сокровищница, неистовство. */
+  mod?: FloorMod | null
 }
 
 export type Prompt = { kind: 'stairs' } | { kind: 'altar'; x: number; y: number } | null
@@ -83,3 +91,6 @@ export type Fx =
   | { t: 'whirl' }
   | { t: 'shake' }
   | { t: 'floor'; f: number }
+  | { t: 'block'; x: number; y: number }
+  | { t: 'boom'; x: number; y: number }
+  | { t: 'enrage'; id: number }

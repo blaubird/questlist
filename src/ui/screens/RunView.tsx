@@ -1,6 +1,6 @@
 // Забег: окно Phaser (грузится лениво) + интерфейс поверх него.
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
-import { ALTAR, DESCEND_HEAL, MAP_H, MAP_W, POTION_HEAL, WHIRL } from '../../core/config.ts'
+import { ALTAR, DESCEND_HEAL, FLOOR_MOD, MAP_H, MAP_W, POTION_HEAL, WHIRL } from '../../core/config.ts'
 import { computeVisible } from '../../core/dungeon/fov.ts'
 import { altarCost, greed, runStats } from '../../core/dungeon/run.ts'
 import type { Run } from '../../core/dungeon/types.ts'
@@ -224,6 +224,11 @@ export function RunView() {
           <div className="hud-floor">
             Этаж {formatBig(r.f)} <span>{b.n}</span>
           </div>
+          {r.mod && (
+            <div className={`hud-mod mod-${r.mod}`} title={FLOOR_MOD.about[r.mod]}>
+              {FLOOR_MOD.name[r.mod]} · {FLOOR_MOD.about[r.mod]}
+            </div>
+          )}
           <div className="hud-hp">
             <Icon name="heart" size={14} />
             <Meter value={r.hp} max={st.maxHp} tone={r.hp < st.maxHp * 0.35 ? '#ff5c7a' : '#7dff9a'} />

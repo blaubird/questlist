@@ -203,5 +203,42 @@ export const SOULS = {
   lootPerSoul: 0.02,
 } as const
 
+// ---------- Глубина: свойства элиты, ярость боссов, модификаторы этажей (только после ранней игры) ----------
+export type Affix = 'vampire' | 'explosive' | 'swift' | 'shield'
+export const AFFIX = {
+  /** Свойства — только у элиты со второго круга краёв: ранняя игра и плато на 21–25 не утяжеляются. */
+  fromFloor: 26,
+  list: ['vampire', 'explosive', 'swift', 'shield'] as readonly Affix[],
+  name: { vampire: 'вампир', explosive: 'взрывной', swift: 'быстрый', shield: 'щит' } as Record<
+    Affix,
+    string
+  >,
+  /** Вампир лечится на долю нанесённого урона. */
+  vampireHeal: 0.4,
+  /** Взрывной при гибели бьёт соседнюю клетку: атака × mult. */
+  explosiveMult: 1.5,
+  /** Щит поглощает столько ударов целиком. */
+  shieldCharges: 2,
+} as const
+/** Ярость босса: на половине здоровья — атака сильнее и призыв помощников (один раз). */
+export const BOSS_ENRAGE = { fromFloor: 30, at: 0.5, atk: 1.3, minions: 2 } as const
+
+export type FloorMod = 'horde' | 'rich' | 'frenzy'
+export const FLOOR_MOD = {
+  /** С первого повтора круга краёв. */
+  fromFloor: 26,
+  chance: 0.5,
+  list: ['horde', 'rich', 'frenzy'] as readonly FloorMod[],
+  name: { horde: 'Орда', rich: 'Сокровищница', frenzy: 'Неистовство' } as Record<FloorMod, string>,
+  about: {
+    horde: 'монстров больше, добыча ×1,3',
+    rich: 'добыча ×1,5, монстры крепче',
+    frenzy: 'монстры бьют сильнее, опыт ×1,4',
+  } as Record<FloorMod, string>,
+  horde: { count: 1.4, loot: 1.3 },
+  rich: { loot: 1.5, hp: 1.2 },
+  frenzy: { atk: 1.25, xp: 1.4 },
+} as const
+
 /** Ставки казино — доли баланса (минимум — первая ставка BETS). */
 export const BET_SHARES = [0.01, 0.05, 0.1, 0.25] as const

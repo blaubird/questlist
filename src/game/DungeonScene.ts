@@ -1,7 +1,7 @@
 // Сцена подземелья: рисует состояние забега из core и проигрывает его визуальные события (Fx).
 // Логики игры здесь нет — только картинка, анимации и тап по клетке.
 import Phaser from 'phaser'
-import { MAP_H, MAP_W } from '../core/config.ts'
+import { FLOOR_MOD, MAP_H, MAP_W, type Affix } from '../core/config.ts'
 import { computeVisible } from '../core/dungeon/fov.ts'
 import type { Fx, Item, Monster, Run } from '../core/dungeon/types.ts'
 import { formatBig } from '../core/format.ts'
@@ -33,6 +33,12 @@ export interface SceneDeps {
 }
 
 const MOVE_MS = 110
+const AFFIX_COLOR: Record<Affix, number> = {
+  vampire: 0xff2f4a,
+  explosive: 0xff7b3a,
+  swift: 0x5fe0c0,
+  shield: 0x4fa8ff,
+}
 const S = 1 / RES // текстуры растеризованы с запасом — масштаб обратно
 
 const cx = (x: number) => (x + 0.5) * TILE
@@ -300,8 +306,11 @@ export class DungeonScene extends Phaser.Scene {
       parts.push(g)
     }
     if (m.elite) {
+      // Цвет кольца — свойство элиты: вампир красный, взрывной оранжевый, быстрый бирюзовый, щит синий.
+      const col = m.affix ? AFFIX_COLOR[m.affix] : 0xffc94d
       const ring = this.add.graphics()
-      ring.lineStyle(2, 0xffc94d, 0.85).strokeEllipse(0, -TILE * 0.04, TILE * 0.84, TILE * 0.26)
+      ring.lineStyle(2, col, 0.9).strokeEllipse(0, -TILE * 0.04, TILE * 0.84, TILE * 0.26)
+      if (m.affix) ring.lineStyle(1, col, 0.5).strokeEllipse(0, -TILE * 0.04, TILE * 1.0, TILE * 0.34)
       parts.push(ring)
     }
     const scale = m.boss ? 1 : m.elite ? 0.82 : 0.74
@@ -333,6 +342,7 @@ export class DungeonScene extends Phaser.Scene {
         this.mons.set(m.id, v)
       }
       v.m = m
+      if (m.enraged) v.spr.setTint(0xff8a9e)
       const visible = this.vis[m.y * MAP_W + m.x] === 1
       v.box.setVisible(visible)
       if (!animating || !visible) v.box.setPosition(cx(m.x), footY(m.y))
@@ -401,7 +411,11 @@ export class DungeonScene extends Phaser.Scene {
       cam.once('camerafadeoutcomplete', () => {
         this.sync(this.deps.getState(), false)
         cam.fadeIn(260, 5, 3, 10)
-        if (r) this.banner(`Этаж ${formatBig(r.f)}`, biomeFor(r.f).n)
+        if (r)
+          this.banner(
+            `Этаж ${formatBig(r.f)}`,
+            r.mod ? `${biomeFor(r.f).n} · ${FLOOR_MOD.name[r.mod]}` : biomeFor(r.f).n,
+          )
       })
       return
     }
@@ -498,6 +512,26 @@ export class DungeonScene extends Phaser.Scene {
         case 'whirl':
           if (!calm) this.ring()
           break
+        case 'block':
+          this.floatText(f.x, f.y, 'блок', '#4fa8ff', 17)
+          if (!calm) this.burst(f.x, f.y, 0x4fa8ff, 10)
+          break
+        case 'boom':
+          if (!calm) {
+            this.burst(f.x, f.y, 0xff7b3a, 30)
+            this.ring(0xff7b3a, cx(f.x), footY(f.y) - TILE * 0.4)
+          }
+          break
+        case 'enrage': {
+          const v = this.mons.get(f.id)
+          if (v && !calm) {
+            v.spr.setTint(0xff4d6d)
+            this.tweens.add({ targets: v.spr, scale: v.spr.scale * 1.12, duration: 160, yoyo: true })
+            this.cameras.main.flash(180, 255, 60, 90)
+          }
+          this.banner('Ярость босса', 'он зовёт свиту')
+          break
+        }
         case 'shake':
           if (!calm) this.cameras.main.shake(110, 0.004)
           break
@@ -608,7 +642,7 @@ export class DungeonScene extends Phaser.Scene {
     this.time.delayedCall(700, () => e.destroy())
   }
 
-  private ring() {
+  private ring(color = 0xffc94d, x?: number, y?: number) {
     const g = this.add.graphics().setDepth(9300)
     const o = { r: TILE * 0.5, a: 1 }
     this.tweens.add({
@@ -618,7 +652,11 @@ export class DungeonScene extends Phaser.Scene {
       duration: 320,
       onUpdate: () => {
         g.clear()
-        g.lineStyle(5 * o.a + 1, 0xffc94d, o.a).strokeCircle(this.hero.x, this.hero.y - TILE * 0.45, o.r)
+        g.lineStyle(5 * o.a + 1, color, o.a).strokeCircle(
+          x ?? this.hero.x,
+          y ?? this.hero.y - TILE * 0.45,
+          o.r,
+        )
       },
       onComplete: () => g.destroy(),
     })
