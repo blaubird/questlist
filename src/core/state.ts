@@ -38,6 +38,10 @@ export interface Counters {
   kills: number
   casinoNet: number
   totalDone: number
+  blessAtk: number
+  blessVit: number
+  blessLoot: number
+  souls: number
 }
 
 export interface Profile extends Counters {
@@ -103,6 +107,10 @@ export function freshProfile(day: string): Profile {
     kills: 0,
     casinoNet: 0,
     totalDone: 0,
+    blessAtk: 0,
+    blessVit: 0,
+    blessLoot: 0,
+    souls: 0,
     skin: START.skin,
     skins: [START.skin],
     tasks: [],

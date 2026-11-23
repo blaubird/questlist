@@ -3,8 +3,8 @@
 import { ARMORS, MAP_W, WEAPONS } from '../src/core/config.ts'
 import { floorsOpen, runStats } from '../src/core/dungeon/run.ts'
 import type { Run } from '../src/core/dungeon/types.ts'
-import { apply, type Action, type Ctx } from '../src/core/engine.ts'
-import { enhCost, heroStats } from '../src/core/hero.ts'
+import { apply, blessOpen, potionCost, type Action, type Ctx } from '../src/core/engine.ts'
+import { blessCost, enhCost, gearComplete, heroStats } from '../src/core/hero.ts'
 import { createRng } from '../src/core/rng.ts'
 import { freshState, type GameState } from '../src/core/state.ts'
 
@@ -26,6 +26,13 @@ export interface DayRow {
   atk: number
   def: number
   hp: number
+  souls: number
+  bless: number
+}
+
+export interface BotOptions {
+  /** Выходить с добычей на этой глубине (множитель добычи уже максимальный). */
+  leaveDepth?: number
 }
 
 const DIRS = [
@@ -84,7 +91,10 @@ function botAction(r: Run): Action {
   return { type: 'run.step', dx: c[0] - r.px, dy: c[1] - r.py }
 }
 
-export function simulate(days: number, seed = 1): DayRow[] {
+export function simulate(days: number, seed = 1, opt: BotOptions = {}): DayRow[] {
+  const leaveDepth = opt.leaveDepth ?? 8
+  /** Стартовый этаж: максимальный открытый, но после смертей на старте — ниже. */
+  let startDrop = 0
   const rng = createRng(seed)
   let n = 0
   const base = Date.UTC(2026, 0, 1)
@@ -122,27 +132,54 @@ export function simulate(days: number, seed = 1): DayRow[] {
         )
         bought = true
       }
+      // Ранняя игра — как бот прототипа (заточка до +10). Поздняя — заточка без ограничений.
+      const late = blessOpen(state.profile)
+      const cap = late ? Infinity : 10
+      const reserve = late ? potionCost(state.profile.checkpoint) * 2 : 0
       const q = state.profile
       const we = enhCost(true, q.wEnh)
-      if (q.wEnh < 10 && q.gold >= we.gold + 30 && q.shards >= we.shards) {
-        act({ type: 'shop.enhance', weapon: true })
-        bought = true
+      const ae = enhCost(false, q.aEnh)
+      // в поздней игре точим то, что дешевле в осколках
+      const order = late && ae.shards < we.shards ? [false, true] : [true, false]
+      for (const weapon of order) {
+        const s = state.profile
+        const n = weapon ? s.wEnh : s.aEnh
+        const c = enhCost(weapon, n)
+        if (n < cap && s.gold >= c.gold + (c.gold ? 30 : 0) && s.shards >= c.shards + reserve) {
+          act({ type: 'shop.enhance', weapon })
+          bought = true
+        }
       }
-      const s = state.profile
-      const ae = enhCost(false, s.aEnh)
-      if (s.aEnh < 10 && s.gold >= ae.gold + 30 && s.shards >= ae.shards) {
-        act({ type: 'shop.enhance', weapon: false })
-        bought = true
+      if (blessOpen(state.profile)) {
+        const s = state.profile
+        const tracks = (['atk', 'vit', 'loot'] as const).map((t) => ({
+          t,
+          lvl: t === 'atk' ? s.blessAtk : t === 'vit' ? s.blessVit : s.blessLoot,
+        }))
+        tracks.sort((a, b) => a.lvl - b.lvl)
+        const t = tracks[0]!
+        // снаряжение важнее: благословение — только если остаётся на следующий предмет
+        const nextGear = gearComplete(s)
+          ? 0
+          : Math.min(WEAPONS[s.weapon + 1]?.cost ?? Infinity, ARMORS[s.armor + 1]?.cost ?? Infinity)
+        if (s.gold >= blessCost(t.lvl) + nextGear) {
+          act({ type: 'shop.bless', track: t.t })
+          bought = true
+        }
       }
     }
-    while (state.profile.potions < 3 && state.profile.shards >= 12) act({ type: 'shop.potion' })
+    while (state.profile.potions < 3 && state.profile.shards >= potionCost(state.profile.checkpoint))
+      act({ type: 'shop.potion' })
+
     // Подземелье
     let deaths = 0
     let maxf = 0
     let runs = 0
     while (state.profile.torches > 0) {
       const fo = floorsOpen(state.profile.checkpoint)
-      act({ type: 'run.start', floor: fo[fo.length - 1]! })
+      const start = fo[Math.max(0, fo.length - 1 - startDrop)]!
+      const cpBefore = state.profile.checkpoint
+      act({ type: 'run.start', floor: start })
       runs++
       for (let steps = 0; state.run && steps < 4000; steps++) {
         const r: Run = state.run
@@ -150,6 +187,9 @@ export function simulate(days: number, seed = 1): DayRow[] {
         if (r.over === 'dead') {
           deaths++
           maxf = Math.max(maxf, r.f)
+          // после перерождения: умер, не пройдя стартовый отрезок, — в следующий раз начать пониже
+          if (r.f < start + 5 && state.profile.checkpoint > 21)
+            startDrop = Math.min(startDrop + 1, 3, fo.length - 1)
           act({ type: 'run.finish' })
           break
         }
@@ -159,7 +199,9 @@ export function simulate(days: number, seed = 1): DayRow[] {
           continue
         }
         if (r.prompt?.kind === 'stairs') {
-          if (r.hp > max * 0.5 || r.potions > 0) act({ type: 'run.descend' })
+          if (startDrop > 0 && r.f >= start + 5) startDrop--
+          const deepEnough = state.profile.checkpoint > 21 && r.depth >= leaveDepth
+          if (!deepEnough && (r.hp > max * 0.5 || r.potions > 0)) act({ type: 'run.descend' })
           else {
             maxf = Math.max(maxf, r.f)
             act({ type: 'run.leave' })
@@ -175,6 +217,7 @@ export function simulate(days: number, seed = 1): DayRow[] {
         }
         act(botAction(r))
       }
+      if (state.profile.checkpoint > cpBefore) startDrop = 0
       if (state.run) {
         // застрял — засчитываем этаж и выходим без добычи
         maxf = Math.max(maxf, state.run.f)
@@ -201,6 +244,8 @@ export function simulate(days: number, seed = 1): DayRow[] {
       atk: st.atk,
       def: st.def,
       hp: st.maxHp,
+      souls: p.souls,
+      bless: p.blessAtk + p.blessVit + p.blessLoot,
     })
   }
   return out

@@ -3,13 +3,20 @@ import {
   ARMORS,
   ATK_BASE,
   ATK_LVL_DIV,
+  BLESS,
+  CHECKPOINT_STEP,
   DEF_LVL_DIV,
   ENH_ARMOR,
+  ENH_OVER,
+  ENH_SOFT,
   ENH_WEAPON,
   HP_BASE,
   HP_PER_LVL,
+  SCALE_FROM,
+  SOULS,
   WEAPONS,
   XP_NEED_K,
+  type BlessTrack,
   type GearTier,
 } from './config.ts'
 
@@ -28,6 +35,8 @@ export function addXp(lvl: number, xp: number, gain: number): { lvl: number; xp:
 
 export const weaponTier = (i: number): GearTier => WEAPONS[Math.min(i, WEAPONS.length - 1)]!
 export const armorTier = (i: number): GearTier => ARMORS[Math.min(i, ARMORS.length - 1)]!
+export const gearComplete = (h: { weapon: number; armor: number }): boolean =>
+  h.weapon >= WEAPONS.length - 1 && h.armor >= ARMORS.length - 1
 
 export interface HeroLike {
   lvl: number
@@ -35,7 +44,23 @@ export interface HeroLike {
   armor: number
   wEnh: number
   aEnh: number
+  blessAtk: number
+  blessVit: number
+  blessLoot: number
+  souls: number
 }
+
+export const pickHero = (p: HeroLike): HeroLike => ({
+  lvl: p.lvl,
+  weapon: p.weapon,
+  armor: p.armor,
+  wEnh: p.wEnh,
+  aEnh: p.aEnh,
+  blessAtk: p.blessAtk,
+  blessVit: p.blessVit,
+  blessLoot: p.blessLoot,
+  souls: p.souls,
+})
 
 export interface HeroStats {
   maxHp: number
@@ -43,16 +68,40 @@ export interface HeroStats {
   def: number
 }
 
+/** Множитель заточки выше мягкого потолка. */
+const overEnh = (n: number) => ENH_OVER.mult ** Math.max(0, n - ENH_SOFT)
+export const soulMult = (souls: number) => 1 + SOULS.perSoul * souls
+
 export function heroStats(h: HeroLike): HeroStats {
+  const soul = soulMult(h.souls)
+  const vit = BLESS.mult ** h.blessVit * overEnh(h.aEnh) * soul
+  const baseAtk = ATK_BASE + Math.floor((h.lvl - 1) / ATK_LVL_DIV) + weaponTier(h.weapon).value + h.wEnh
+  const baseDef = Math.floor((h.lvl - 1) / DEF_LVL_DIV) + armorTier(h.armor).value + h.aEnh
   return {
-    maxHp: HP_BASE + HP_PER_LVL * (h.lvl - 1),
-    atk: ATK_BASE + Math.floor((h.lvl - 1) / ATK_LVL_DIV) + weaponTier(h.weapon).value + h.wEnh,
-    def: Math.floor((h.lvl - 1) / DEF_LVL_DIV) + armorTier(h.armor).value + h.aEnh,
+    maxHp: Math.round((HP_BASE + HP_PER_LVL * (h.lvl - 1)) * vit),
+    atk: baseAtk * BLESS.mult ** h.blessAtk * overEnh(h.wEnh) * soul,
+    def: baseDef * vit,
   }
 }
 
-/** Цена шага заточки n→n+1: [золото, осколки]. */
+/** Множитель добычи осколков и опыта от благословения Удачи и душ. */
+export const lootMult = (h: Pick<HeroLike, 'blessLoot' | 'souls'>): number =>
+  BLESS.mult ** h.blessLoot * (1 + SOULS.lootPerSoul * h.souls)
+
+/** Цена шага заточки n→n+1. До ENH_SOFT — как в прототипе, дальше — только осколки, экспоненциально. */
 export function enhCost(weapon: boolean, n: number): { gold: number; shards: number } {
   const c = weapon ? ENH_WEAPON : ENH_ARMOR
-  return { gold: c.gold * (n + 1), shards: c.shards * (n + 1) }
+  if (n < ENH_SOFT) return { gold: c.gold * (n + 1), shards: c.shards * (n + 1) }
+  return { gold: 0, shards: Math.round(c.shards * ENH_SOFT * ENH_OVER.costGrowth ** (n - ENH_SOFT + 1)) }
 }
+
+export const blessCost = (level: number): number => BLESS.baseCost + BLESS.costPerLevel * level
+
+const BLESS_KEYS = { atk: 'blessAtk', vit: 'blessVit', loot: 'blessLoot' } as const
+export const blessKey = (t: BlessTrack) => BLESS_KEYS[t]
+
+/** Всего душ за чекпоинт: только за рекорды после ранней игры (чекпоинт > SCALE_FROM + 1). */
+export const soulsFor = (checkpoint: number): number =>
+  checkpoint <= SCALE_FROM + 1
+    ? 0
+    : Math.floor(((checkpoint - SCALE_FROM - 1) / CHECKPOINT_STEP) ** SOULS.pow)

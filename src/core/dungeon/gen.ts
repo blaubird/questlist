@@ -13,8 +13,8 @@ import {
   MAP_H,
   MAP_W,
   MON_COUNT,
-  MON_SCALE,
   MONSTERS,
+  MON_GROWTH,
   PACK_MAX,
   ROOM_H,
   ROOM_W,
@@ -23,6 +23,7 @@ import {
   SPAWN_MIN_DIST,
   type MonsterDef,
 } from '../config.ts'
+import { lootScale, monScale, over } from './scale.ts'
 import type { Rng } from '../rng.ts'
 import type { Floor, Item, Monster } from './types.ts'
 
@@ -107,9 +108,7 @@ export function genFloor(f: number, rng: Rng, nextId: () => number): Floor {
   }
 
   // Монстры
-  const hm = 1 + MON_SCALE.hp * (f - 1)
-  const am = 1 + MON_SCALE.atk * (f - 1)
-  const xm = 1 + MON_SCALE.xp * (f - 1)
+  const { hp: hm, atk: am, xp: xm } = monScale(f)
   const pool = MONSTERS.filter((m) => m.minFloor <= f)
   const deep = pool.slice(-LEADER_DEEP_POOL)
   const make = (m: MonsterDef, x: number, y: number): Monster => {
@@ -165,15 +164,15 @@ export function genFloor(f: number, rng: Rng, nextId: () => number): Floor {
     }
     const [bx, by] = free ?? near.find(([x, y]) => grid[y]?.[x] === '.')!
     occ.add(key(bx, by))
-    const hp = Math.round(b.hp * bm * (1 + BOSS_HP_PER_FLOOR * (f - BOSS_EVERY)))
+    const hp = Math.round(b.hp * bm * (1 + BOSS_HP_PER_FLOOR * (f - BOSS_EVERY)) * MON_GROWTH.hp ** over(f))
     mons.push({
       id: nextId(),
       kind: b.id,
       name: b.name,
       hp,
       mhp: hp,
-      atk: round1(b.atk * bm),
-      xp: Math.round(b.xp * bm),
+      atk: round1(b.atk * bm * MON_GROWTH.atk ** over(f)),
+      xp: Math.round(b.xp * bm * MON_GROWTH.xp ** over(f)),
       x: bx,
       y: by,
       awake: false,
@@ -190,9 +189,11 @@ export function genFloor(f: number, rng: Rng, nextId: () => number): Floor {
     if (!p) break
     const q = rng.next()
     const [x, y] = p
-    if (q < ITEM_ODDS.shard) items.push({ x, y, kind: 'shard', amount: rng.int(1, 2) + Math.floor(f / 3) })
+    const ls = lootScale(f)
+    if (q < ITEM_ODDS.shard)
+      items.push({ x, y, kind: 'shard', amount: Math.round((rng.int(1, 2) + Math.floor(f / 3)) * ls) })
     else if (q < ITEM_ODDS.shard + ITEM_ODDS.chest)
-      items.push({ x, y, kind: 'chest', amount: rng.int(3, 6) + f })
+      items.push({ x, y, kind: 'chest', amount: Math.round((rng.int(3, 6) + f) * ls) })
     else if (q < ITEM_ODDS.shard + ITEM_ODDS.chest + ITEM_ODDS.meat)
       items.push({ x, y, kind: 'meat', amount: 0 })
     else items.push({ x, y, kind: 'potion', amount: 0 })

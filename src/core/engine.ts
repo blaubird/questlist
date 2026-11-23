@@ -4,7 +4,9 @@
 import { rollChest, spinRoulette, spinSlots, type RouletteBet } from './casino.ts'
 import {
   ARMORS,
+  BET_SHARES,
   BETS,
+  BLESS,
   CHEST_COST,
   CHEST_DUP_SHARDS,
   ENH_MAX,
@@ -13,6 +15,7 @@ import {
   STREAK_DAY_TASKS,
   UNDO_MS,
   WEAPONS,
+  type BlessTrack,
   type Difficulty,
 } from './config.ts'
 import {
@@ -28,7 +31,8 @@ import {
 } from './dungeon/run.ts'
 import type { Fx, Run } from './dungeon/types.ts'
 import { currentStreak, taskReward, type DayCtx } from './economy.ts'
-import { enhCost } from './hero.ts'
+import { lootScale } from './dungeon/scale.ts'
+import { blessCost, blessKey, enhCost, pickHero, soulsFor } from './hero.ts'
 import type { Rng } from './rng.ts'
 import { SKIN_BY_ID } from './skins.ts'
 import { applyPatch, type GameState, type Patch, type ProfileEvent, type Task } from './state.ts'
@@ -53,6 +57,7 @@ export type Action =
   | { type: 'shop.armor'; tier: number }
   | { type: 'shop.enhance'; weapon: boolean }
   | { type: 'shop.potion' }
+  | { type: 'shop.bless'; track: BlessTrack }
   | { type: 'skin.set'; id: string }
   | { type: 'casino.slots'; bet: number }
   | { type: 'casino.roulette'; bet: number; on: RouletteBet }
@@ -81,6 +86,19 @@ export interface Result {
 }
 
 const MAX_TITLE = 140
+
+/** Цены, растущие с глубиной (осколки дешевеют по мере роста добычи). */
+export const potionCost = (checkpoint: number) => Math.round(POTION_COST * lootScale(checkpoint))
+export const chestDupShards = (checkpoint: number) => Math.round(CHEST_DUP_SHARDS * lootScale(checkpoint))
+
+/** Варианты ставок: доли баланса, не меньше минимальной ставки. */
+export function betOptions(gold: number): number[] {
+  const min = BETS[0]
+  return [...new Set(BET_SHARES.map((s) => Math.max(min, Math.floor(gold * s))))]
+}
+const validBet = (bet: number, gold: number) => Number.isInteger(bet) && bet >= BETS[0] && bet <= gold
+
+export const blessOpen = (p: { checkpoint: number }) => p.checkpoint >= BLESS.minCheckpoint
 
 export function apply(state: GameState, action: Action, ctx: Ctx): Result {
   const events: ProfileEvent[] = []
@@ -197,10 +215,20 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
     }
     case 'shop.potion': {
       if (state.run) return fail('Во время забега лавка закрыта')
-      if (p().shards < POTION_COST || p().potions >= POTION_MAX) return fail('Нельзя купить')
-      emit('shop.potion', { add: { shards: -POTION_COST, potions: 1 } })
+      const cost = potionCost(p().checkpoint)
+      if (p().shards < cost || p().potions >= POTION_MAX) return fail('Нельзя купить')
+      emit('shop.potion', { add: { shards: -cost, potions: 1 } })
       return done()
     }
+    case 'shop.bless': {
+      if (!blessOpen(p())) return fail(`Благословения — с чекпоинта ${BLESS.minCheckpoint}`)
+      const key = blessKey(action.track)
+      const cost = blessCost(p()[key])
+      if (p().gold < cost) return fail('Не хватает золота')
+      emit('shop.bless', { add: { gold: -cost, [key]: 1 } })
+      return done()
+    }
+
     case 'skin.set': {
       if (!SKIN_BY_ID.has(action.id) || !p().skins.includes(action.id)) return fail('Облик закрыт')
       emit('skin.set', { set: { skin: action.id } })
@@ -209,16 +237,14 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
 
     // ---------- Казино ----------
     case 'casino.slots': {
-      if (!(BETS as readonly number[]).includes(action.bet)) return fail('Нет такой ставки')
-      if (p().gold < action.bet) return fail('Не хватает золота')
+      if (!validBet(action.bet, p().gold)) return fail('Нет такой ставки')
       const res = spinSlots(ctx.rng)
       const net = res.mult * action.bet - action.bet
       emit('casino.slots', { add: { gold: net, casinoNet: net } })
       return done(state.run, [], { ...res, pay: res.mult * action.bet })
     }
     case 'casino.roulette': {
-      if (!(BETS as readonly number[]).includes(action.bet)) return fail('Нет такой ставки')
-      if (p().gold < action.bet) return fail('Не хватает золота')
+      if (!validBet(action.bet, p().gold)) return fail('Нет такой ставки')
       const res = spinRoulette(ctx.rng, action.on)
       const net = res.mult * action.bet - action.bet
       emit('casino.roulette', { add: { gold: net, casinoNet: net } })
@@ -231,7 +257,7 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
       const patch: Patch = action.scroll
         ? { add: { scrolls: -1 } }
         : { add: { gold: -CHEST_COST, casinoNet: -CHEST_COST } }
-      if (dup) patch.add = { ...patch.add, shards: CHEST_DUP_SHARDS }
+      if (dup) patch.add = { ...patch.add, shards: chestDupShards(p().checkpoint) }
       else patch.skinsAdd = [res.skin]
       emit('casino.chest', patch)
       return done(state.run, [], { ...res, dup })
@@ -244,14 +270,7 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
       if (!floorsOpen(p().checkpoint).includes(action.floor)) return fail('Этаж закрыт')
       const prof = p()
       const run = startRun({
-        hero: {
-          lvl: prof.lvl,
-          xp: prof.xp,
-          weapon: prof.weapon,
-          armor: prof.armor,
-          wEnh: prof.wEnh,
-          aEnh: prof.aEnh,
-        },
+        hero: { ...pickHero(prof), xp: prof.xp },
         startFloor: action.floor,
         seed: ctx.rng.int(1, 0x7fffffff),
         potions: prof.potions,
@@ -270,6 +289,8 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
       if (leaving && r.prompt?.kind !== 'stairs') return fail('Выйти можно только у портала')
       if (!leaving && r.over !== 'dead') return fail('Забег ещё идёт')
       const shards = leaving ? Math.round(r.shards * greed(r.depth)) : 0
+      const checkpoint = Math.max(p().checkpoint, r.checkpoint)
+      const souls = Math.max(0, soulsFor(checkpoint) - p().souls)
       emit('run.end', {
         add: {
           xp: r.xpGain,
@@ -277,13 +298,11 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
           kills: r.kills,
           potions: r.potions - r.potionsStart,
           scrolls: r.scrolls,
+          souls,
         },
-        set: {
-          checkpoint: Math.max(p().checkpoint, r.checkpoint),
-          best: Math.max(p().best, r.f),
-        },
+        set: { checkpoint, best: Math.max(p().best, r.f) },
       })
-      return done(null, [], { shards, xp: r.xpGain, floor: r.f, dead: !leaving })
+      return done(null, [], { shards, xp: r.xpGain, floor: r.f, dead: !leaving, souls })
     }
     default: {
       const r0 = state.run

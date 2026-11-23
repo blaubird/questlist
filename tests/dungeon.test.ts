@@ -73,7 +73,18 @@ describe('забег', () => {
   it('один и тот же seed и ходы дают одинаковый результат', () => {
     const play = () => {
       const r = startRun({
-        hero: { lvl: 3, xp: 0, weapon: 1, armor: 1, wEnh: 0, aEnh: 0 },
+        hero: {
+          lvl: 3,
+          xp: 0,
+          weapon: 1,
+          armor: 1,
+          wEnh: 0,
+          aEnh: 0,
+          blessAtk: 0,
+          blessVit: 0,
+          blessLoot: 0,
+          souls: 0,
+        },
         startFloor: 1,
         seed: 99,
         potions: 2,

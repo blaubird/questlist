@@ -55,7 +55,8 @@ export const ARMORS: readonly GearTier[] = [
 /** Заточка оружия: шаг n→n+1 стоит [gold·(n+1), shards·(n+1)]. */
 export const ENH_WEAPON = { gold: 15, shards: 8 } as const
 export const ENH_ARMOR = { gold: 20, shards: 10 } as const
-export const ENH_MAX = 25
+/** Потолка заточки нет: выше ENH_SOFT — см. ENH_OVER. */
+export const ENH_MAX = Infinity
 
 export const POTION_COST = 12
 export const POTION_MAX = 5
@@ -163,3 +164,37 @@ export const CHEST_ODDS: readonly (readonly [Rarity, number])[] = [
   ['epic', 0.1],
   ['legendary', 0.02],
 ]
+
+// ---------- Масштаб до 1000+ (docs/PROGRESSION.md) ----------
+/** До этого этажа — баланс прототипа; дальше включается экспоненциальный рост. */
+export const SCALE_FROM = 20
+/** Рост монстров за этаж после SCALE_FROM. */
+export const MON_GROWTH = { hp: 1.08, atk: 1.07, xp: 1.08 } as const
+/** Рост добычи осколков за этаж после SCALE_FROM. */
+export const LOOT_GROWTH = 1.08
+
+/** Заточка выше мягкого потолка: только осколки, эффект множителем. */
+export const ENH_SOFT = 25
+export const ENH_OVER = { mult: 1.05, costGrowth: 1.08 } as const
+
+/** Благословения за золото: открываются с чекпоинта BLESS.minCheckpoint. */
+export type BlessTrack = 'atk' | 'vit' | 'loot'
+export const BLESS = {
+  mult: 1.1,
+  baseCost: 300,
+  costPerLevel: 100,
+  minCheckpoint: 21,
+} as const
+
+/** Души: начисляются сами за рекорд чекпоинта, навсегда. Без сбросов. */
+export const SOULS = {
+  /** души = floor(((checkpoint − 21) / 5) ^ pow) — только поздняя игра */
+  pow: 1.6,
+  /** сила × (1 + perSoul · души) */
+  perSoul: 0.1,
+  /** осколки и опыт × (1 + lootPerSoul · души) */
+  lootPerSoul: 0.05,
+} as const
+
+/** Ставки казино — доли баланса (минимум — первая ставка BETS). */
+export const BET_SHARES = [0.01, 0.05, 0.1, 0.25] as const

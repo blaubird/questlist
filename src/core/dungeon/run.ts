@@ -21,10 +21,11 @@ import {
   WAKE_FORGET_DIST,
   WHIRL,
 } from '../config.ts'
-import { addXp, heroStats } from '../hero.ts'
+import { addXp, heroStats, lootMult } from '../hero.ts'
 import { createRng, type Rng } from '../rng.ts'
 import { computeVisible, isWall } from './fov.ts'
 import { genFloor } from './gen.ts'
+import { lootScale } from './scale.ts'
 import type { Fx, Monster, Run, RunHero } from './types.ts'
 
 const LOG_MAX = 6
@@ -37,6 +38,9 @@ const DIRS = [
 
 export const greed = (depth: number): number => Math.min(GREED_MAX, 1 + GREED_PER_DEPTH * depth)
 export const runStats = (r: Run) => heroStats(r.hero)
+
+/** Осколки с учётом глубины, Удачи и душ. */
+const loot = (r: Run, base: number) => Math.max(1, Math.round(base * lootScale(r.f) * lootMult(r.hero)))
 
 /** Доступные стартовые этажи: 1, 6, 11, … до чекпоинта. */
 export function floorsOpen(checkpoint: number): number[] {
@@ -103,7 +107,8 @@ export function startRun(o: { hero: RunHero; startFloor: number; seed: number; p
   return r
 }
 
-function gainXp(r: Run, amount: number, fx: Fx[]) {
+function gainXp(r: Run, base: number, fx: Fx[]) {
+  const amount = Math.round(base * lootMult(r.hero))
   const before = r.hero.lvl
   const next = addXp(r.hero.lvl, r.hero.xp, amount)
   r.hero.lvl = next.lvl
@@ -121,11 +126,11 @@ function kill(r: Run, m: Monster, rng: Rng, fx: Fx[]) {
   r.mons = r.mons.filter((x) => x !== m)
   r.kills++
   fx.push({ t: 'kill', id: m.id, x: m.x, y: m.y, boss: m.boss })
-  say(r, `${m.name} повержен. +${m.xp} опыта`)
+  say(r, `${m.name} повержен.`)
   gainXp(r, m.xp, fx)
   let sh = 0
-  if (m.elite) sh = 3 + Math.floor(r.f / 2)
-  else if (rng.chance(LOOT.shardChance)) sh = 1 + Math.floor(r.f / 4)
+  if (m.elite) sh = loot(r, 3 + Math.floor(r.f / 2))
+  else if (rng.chance(LOOT.shardChance)) sh = loot(r, 1 + Math.floor(r.f / 4))
   if (sh) {
     r.shards += sh
     fx.push({ t: 'loot', x: m.x, y: m.y, amount: sh, kind: 'shard' })
@@ -142,7 +147,7 @@ function kill(r: Run, m: Monster, rng: Rng, fx: Fx[]) {
   }
   if (m.boss) {
     r.bossDead = true
-    const a = 5 + r.f
+    const a = loot(r, 5 + r.f)
     r.shards += a
     r.checkpoint = Math.max(r.checkpoint, r.f + 1)
     say(r, `Босс пал! +${a} осколков. Чекпоинт: этаж ${r.f + 1}.`)
@@ -171,9 +176,10 @@ function pickup(r: Run, fx: Fx[]) {
   const it = r.items.splice(i, 1)[0]!
   const max = runStats(r).maxHp
   if (it.kind === 'shard' || it.kind === 'chest') {
-    r.shards += it.amount
-    say(r, `${it.kind === 'chest' ? 'Сундук' : 'Осколки'}: +${it.amount}`)
-    fx.push({ t: 'loot', x: r.px, y: r.py, amount: it.amount, kind: 'shard' })
+    const a = Math.round(it.amount * lootMult(r.hero))
+    r.shards += a
+    say(r, `${it.kind === 'chest' ? 'Сундук' : 'Осколки'}: +${a}`)
+    fx.push({ t: 'loot', x: r.px, y: r.py, amount: a, kind: 'shard' })
   } else if (it.kind === 'meat') {
     const h = Math.round(max * MEAT_HEAL)
     r.hp = Math.min(max, r.hp + h)
@@ -185,8 +191,9 @@ function pickup(r: Run, fx: Fx[]) {
       say(r, 'Нашёл зелье')
       fx.push({ t: 'loot', x: r.px, y: r.py, amount: 1, kind: 'potion' })
     } else {
-      r.shards += POTION_FULL_SHARDS
-      say(r, `Сумка полна — зелье ушло за ${POTION_FULL_SHARDS} осколка`)
+      const a = loot(r, POTION_FULL_SHARDS)
+      r.shards += a
+      say(r, `Сумка полна — зелье ушло за ${a} осколков`)
     }
   }
 }
@@ -360,7 +367,7 @@ export function runAltar(r: Run, accept: boolean): Fx[] {
   if (!accept) return fx
   const cost = Math.round(runStats(r).maxHp * ALTAR.hpCost)
   if (r.hp <= cost) return fx
-  const gain = 5 + r.f
+  const gain = loot(r, 5 + r.f)
   r.hp -= cost
   r.shards += gain
   r.depth += ALTAR.depth

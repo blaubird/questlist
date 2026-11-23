@@ -50,6 +50,7 @@ describe('казино', () => {
   it('нестандартная ставка и ставка без золота отклоняются', () => {
     const w = world()
     expect(w.act({ type: 'casino.slots', bet: 7 }).error).toBeDefined()
+    expect(w.act({ type: 'casino.slots', bet: 10.5 }).error).toBeDefined()
     expect(w.act({ type: 'casino.slots', bet: 100 }).error).toBeDefined()
   })
 })
