@@ -1,42 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
-import { START } from '../core/config.ts'
 import { formatBig } from '../core/format.ts'
+import { xpNeed } from '../core/hero.ts'
+import { SKIN_BY_ID } from '../core/skins.ts'
+import { Meter, Portrait } from './components/bits.tsx'
 import { Icon, type IconName } from './components/Icon.tsx'
+import { ToastProvider } from './components/Toasts.tsx'
+import { GameProvider } from './GameProvider.tsx'
+import { useProfile } from './useGame.ts'
+import { Casino } from './screens/Casino.tsx'
+import { Dungeon } from './screens/Dungeon.tsx'
+import { Hero } from './screens/Hero.tsx'
+import { Tasks } from './screens/Tasks.tsx'
 
 type Tab = 'tasks' | 'dungeon' | 'hero' | 'casino'
 
-const TABS: { id: Tab; label: string; icon: IconName; title: string; lead: string }[] = [
-  {
-    id: 'tasks',
-    label: 'Задачи',
-    icon: 'tasks',
-    title: 'Задачи',
-    lead: 'Реальные дела приносят золото и факелы.',
-  },
-  {
-    id: 'dungeon',
-    label: 'Подземелье',
-    icon: 'dungeon',
-    title: 'Подземелье',
-    lead: 'Один факел — один забег. Глубже — богаче.',
-  },
-  { id: 'hero', label: 'Герой', icon: 'hero', title: 'Герой', lead: 'Снаряжение, заточка и облики.' },
-  {
-    id: 'casino',
-    label: 'Казино',
-    icon: 'casino',
-    title: 'Казино',
-    lead: 'Только игровое золото. Дом всегда в плюсе.',
-  },
+const TABS: { id: Tab; label: string; icon: IconName; view: () => ReactNode }[] = [
+  { id: 'tasks', label: 'Задачи', icon: 'tasks', view: () => <Tasks /> },
+  { id: 'dungeon', label: 'Подземелье', icon: 'dungeon', view: () => <Dungeon /> },
+  { id: 'hero', label: 'Герой', icon: 'hero', view: () => <Hero /> },
+  { id: 'casino', label: 'Казино', icon: 'casino', view: () => <Casino /> },
 ]
 
 const TAB_KEY = 'ql.tab'
 
+const isTab = (v: string): v is Tab => TABS.some((t) => t.id === v)
+
 function readTab(): Tab {
+  const h = location.hash.slice(1)
+  if (isTab(h)) return h
   try {
     const v = localStorage.getItem(TAB_KEY)
-    if (v && TABS.some((t) => t.id === v)) return v as Tab
+    if (v && isTab(v)) return v
   } catch {
     /* хранилище недоступно — не страшно */
   }
@@ -44,19 +39,41 @@ function readTab(): Tab {
 }
 
 function Currencies() {
+  const p = useProfile()
   const items: { icon: IconName; value: number; cls: string; label: string }[] = [
-    { icon: 'gold', value: START.gold, cls: 'cur-gold', label: 'Золото' },
-    { icon: 'torch', value: START.torches, cls: 'cur-torch', label: 'Факелы' },
-    { icon: 'shard', value: 0, cls: 'cur-shard', label: 'Осколки' },
+    { icon: 'gold', value: p.gold, cls: 'cur-gold', label: 'Золото' },
+    { icon: 'torch', value: p.torches, cls: 'cur-torch', label: 'Факелы' },
+    { icon: 'shard', value: p.shards, cls: 'cur-shard', label: 'Осколки' },
   ]
   return (
     <div className="currencies">
       {items.map((c) => (
-        <span key={c.icon} className={`currency ${c.cls}`} title={c.label}>
+        <span
+          key={c.icon}
+          className={`currency ${c.cls}`}
+          title={c.label}
+          aria-label={`${c.label}: ${c.value}`}
+        >
           <Icon name={c.icon} size={18} />
-          <b>{formatBig(c.value)}</b>
+          <b key={c.value} className="tick">
+            {formatBig(c.value)}
+          </b>
         </span>
       ))}
+    </div>
+  )
+}
+
+function HeroMini() {
+  const p = useProfile()
+  return (
+    <div className="hero-mini card">
+      <Portrait id={p.skin} size="sm" />
+      <div className="hero-mini-text">
+        <div className="hero-mini-name">{SKIN_BY_ID.get(p.skin)?.name}</div>
+        <div className="hero-mini-sub">Уровень {formatBig(p.lvl)}</div>
+        <Meter value={p.xp} max={xpNeed(p.lvl)} />
+      </div>
     </div>
   )
 }
@@ -68,7 +85,7 @@ function UpdateToast() {
   } = useRegisterSW()
   if (!needRefresh) return null
   return (
-    <div className="toast" role="status">
+    <div className="toast toast-update" role="status">
       <span>Есть новая версия</span>
       <button className="btn-pearl btn-sm" onClick={() => void updateServiceWorker(true)}>
         Обновить
@@ -80,7 +97,7 @@ function UpdateToast() {
   )
 }
 
-export function App() {
+function Shell() {
   const [tab, setTab] = useState<Tab>(readTab)
   const current = TABS.find((t) => t.id === tab) ?? TABS[0]!
 
@@ -90,7 +107,19 @@ export function App() {
     } catch {
       /* ничего */
     }
+    if (location.hash.slice(1) !== tab) history.replaceState(null, '', `#${tab}`)
+    window.scrollTo({ top: 0 })
   }, [tab])
+
+  // Ссылка вида #casino открывает нужную вкладку (и кнопка «назад» на вкладку, если её хэш поменяли руками).
+  useEffect(() => {
+    const on = () => {
+      const h = location.hash.slice(1)
+      if (isTab(h)) setTab(h)
+    }
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
 
   return (
     <div className="shell">
@@ -104,6 +133,7 @@ export function App() {
             <button
               key={t.id}
               className={`side-link ${t.id === tab ? 'active' : ''}`}
+              aria-current={t.id === tab ? 'page' : undefined}
               onClick={() => setTab(t.id)}
             >
               <Icon name={t.icon} />
@@ -111,13 +141,7 @@ export function App() {
             </button>
           ))}
         </nav>
-        <div className="hero-mini card">
-          <div className="hero-mini-portrait" />
-          <div>
-            <div className="hero-mini-name">Ученик мага</div>
-            <div className="hero-mini-sub">Уровень 1</div>
-          </div>
-        </div>
+        <HeroMini />
       </aside>
 
       <header className="topbar">
@@ -128,21 +152,18 @@ export function App() {
       </header>
 
       <main className="content" key={tab}>
-        <h1>{current.title}</h1>
-        <p className="lead">{current.lead}</p>
-        <section className="card empty">
-          <div className="empty-icon">
-            <Icon name={current.icon} size={40} />
-          </div>
-          <p>Скоро здесь.</p>
-          <p className="mute">Каркас готов — экран появится на этапе 2.</p>
-        </section>
+        {current.view()}
         <p className="build">сборка {__BUILD__}</p>
       </main>
 
       <nav className="tabbar">
         {TABS.map((t) => (
-          <button key={t.id} className={`tab ${t.id === tab ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+          <button
+            key={t.id}
+            className={`tab ${t.id === tab ? 'active' : ''}`}
+            aria-current={t.id === tab ? 'page' : undefined}
+            onClick={() => setTab(t.id)}
+          >
             <Icon name={t.icon} />
             <span>{t.label}</span>
           </button>
@@ -151,5 +172,15 @@ export function App() {
 
       <UpdateToast />
     </div>
+  )
+}
+
+export function App() {
+  return (
+    <GameProvider fallback={<div className="boot" aria-busy="true" />}>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </GameProvider>
   )
 }

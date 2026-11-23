@@ -12,6 +12,7 @@ import '@fontsource/cormorant-garamond/cyrillic-500.css'
 import '@fontsource/cormorant-garamond/cyrillic-600.css'
 import './ui/styles/tokens.css'
 import './ui/styles/app.css'
+import './ui/styles/screens.css'
 import { App } from './ui/App.tsx'
 
 const root = document.getElementById('root')

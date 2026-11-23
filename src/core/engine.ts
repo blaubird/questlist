@@ -49,6 +49,8 @@ export interface Ctx extends DayCtx {
 }
 
 export type Action =
+  /** Ничего не делает, кроме смены дня (часы интерфейса: полночь при открытом приложении). */
+  | { type: 'tick' }
   | { type: 'task.add'; title: string; diff: Difficulty; daily: boolean }
   | { type: 'task.complete'; id: string }
   | { type: 'task.undo'; event: ProfileEvent }
@@ -125,6 +127,8 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
   const p = () => profile
 
   switch (action.type) {
+    case 'tick':
+      return done()
     // ---------- Задачи ----------
     case 'task.add': {
       const title = action.title.trim().slice(0, MAX_TITLE)
