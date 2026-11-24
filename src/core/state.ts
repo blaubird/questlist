@@ -74,6 +74,8 @@ export type TaskOp =
 export interface Patch {
   add?: Partial<Counters>
   set?: Partial<Counters & Pick<Profile, 'skin' | 'lastQ'>>
+  /** Поднять до значения, если сейчас меньше (рекорд, чекпоинт, тир снаряжения): устаревшее устройство не откатит. */
+  max?: Partial<Counters>
   skinsAdd?: string[]
   tasks?: TaskOp[]
   /** Смена дня применяется, только если профиль ещё в более раннем дне (защита от двойной смены на двух устройствах). */
@@ -171,6 +173,10 @@ export function applyPatch(p: Profile, patch: Patch): Profile {
     }
   }
   if (patch.set) next = { ...next, ...patch.set }
+  if (patch.max) {
+    next = { ...next }
+    for (const [k, v] of Object.entries(patch.max) as [CounterKey, number][]) next[k] = Math.max(next[k], v)
+  }
   if (patch.skinsAdd?.length) {
     const have = new Set(next.skins)
     next = { ...next, skins: [...next.skins, ...patch.skinsAdd.filter((s) => !have.has(s))] }
@@ -183,7 +189,40 @@ export function applyPatch(p: Profile, patch: Patch): Profile {
   return next
 }
 
-/** Редьюсер для foldEvents. */
+/** Тратимые ресурсы: в минус не уходят. */
+const SPEND: readonly CounterKey[] = ['gold', 'torches', 'shards', 'scrolls', 'potions']
+
+/**
+ * Событие с другого устройства, которое после слияния журналов уже невозможно:
+ * задачу закрыли на двух устройствах, покупка без денег (потратили офлайн на другом), тот же тир дважды.
+ * На своём устройстве такого не бывает: engine проверяет то же самое до события.
+ */
+export function conflicts(p: Profile, type: string, patch: Patch): boolean {
+  const op = patch.tasks?.[0]
+  if ((type === 'task.done' || type === 'task.undo') && op?.op === 'patch') {
+    const t = p.tasks.find((x) => x.id === op.id)
+    if (t && t.done === (type === 'task.done')) return true
+  }
+  if (type.startsWith('shop.') || type.startsWith('casino.')) {
+    for (const k of SPEND) {
+      const v = patch.add?.[k]
+      if (v !== undefined && v < 0 && p[k] + v < 0) return true
+    }
+    for (const k of ['weapon', 'armor'] as const) {
+      const v = patch.max?.[k] ?? patch.set?.[k]
+      if (v !== undefined && v <= p[k]) return true
+    }
+  }
+  return false
+}
+
+/** Редьюсер для foldEvents. Невозможные после слияния события пропускаются, ресурсы не уходят в минус. */
 export function evolve(p: Profile, e: GameEvent): Profile {
-  return applyPatch(p, e.data as Patch)
+  const patch = e.data as Patch
+  if (conflicts(p, e.type, patch)) return patch.roll === undefined ? p : applyPatch(p, { roll: patch.roll })
+  const next = applyPatch(p, patch)
+  if (SPEND.every((k) => next[k] >= 0)) return next
+  const fixed = { ...next }
+  for (const k of SPEND) fixed[k] = Math.max(0, fixed[k])
+  return fixed
 }

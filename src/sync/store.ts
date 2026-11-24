@@ -76,7 +76,10 @@ export class GameStore {
   private seq = 0
   private runSave: ReturnType<typeof setTimeout> | null = null
   private storage: Storage
-  private opt: Required<Pick<StoreOptions, 'clock' | 'seed'>> & { channel: Channel | null }
+  private opt: Required<Pick<StoreOptions, 'clock' | 'seed'>> & {
+    channel: Channel | null
+    onLocal?: (() => void) | undefined
+  }
 
   private constructor(storage: Storage, events: ProfileEvent[], meta: Meta, opt: GameStore['opt']) {
     this.storage = storage
@@ -143,7 +146,8 @@ export class GameStore {
         this.ids.add(e.id)
       }
       this.opt.channel?.postMessage({ events: res.events })
-      this.storage.addEvents(res.events).catch((e) => this.fail(e))
+      this.storage.addEvents(res.events, true).catch((e) => this.fail(e))
+      this.opt.onLocal?.()
       this.saveMeta(0)
     } else if (runChanged) this.saveMeta(1500)
     if (res.fx.length) for (const fn of this.fxListeners) fn(res.fx, this.state)
@@ -162,16 +166,39 @@ export class GameStore {
     else write()
   }
 
-  /** Добавляет чужие события (другая вкладка, импорт, сервер). Возвращает число новых. */
-  merge(incoming: readonly ProfileEvent[], persist = false): number {
+  /**
+   * Добавляет чужие события (другая вкладка, импорт, сервер). Возвращает число новых.
+   * persist — записать на диск (вкладка-источник уже записала сама), outbox — ещё и отправить на сервер (импорт).
+   */
+  merge(incoming: readonly ProfileEvent[], persist = false, outbox = false): number {
     const fresh = incoming.filter((e) => !this.ids.has(e.id))
     if (!fresh.length) return 0
     for (const e of fresh) this.ids.add(e.id)
     this.events = mergeEvents(this.events, fresh) as ProfileEvent[]
     this.state = { ...this.state, profile: foldProfile(this.events) }
-    if (persist) this.storage.addEvents(fresh).catch((e) => this.fail(e))
+    if (persist) {
+      const w = this.storage.addEvents(fresh, outbox).catch((e) => this.fail(e))
+      if (outbox) void w.then(() => this.opt.onLocal?.())
+      // Другим вкладкам — чтобы не ждать, пока они сами сходят на сервер.
+      this.opt.channel?.postMessage({ events: fresh })
+    }
     this.emit()
     return fresh.length
+  }
+
+  /** События по id (для отправки на сервер). */
+  byIds(ids: readonly string[]): ProfileEvent[] {
+    const want = new Set(ids)
+    return this.events.filter((e) => want.has(e.id))
+  }
+
+  get storageRef(): Storage {
+    return this.storage
+  }
+
+  /** Сообщать о новых своих событиях (синхронизация отправит их сразу). */
+  set onLocal(fn: (() => void) | undefined) {
+    this.opt.onLocal = fn
   }
 
   /** Перечитать журнал из хранилища (вкладка снова на экране — вдруг пропустили сообщение). */
@@ -204,7 +231,7 @@ export class GameStore {
     if (d?.app !== SAVE_APP) throw new Error('Это не сохранение Квест-листа')
     if (typeof d.v !== 'number' || d.v > SAVE_VERSION) throw new Error('Сохранение из более новой версии')
     if (!Array.isArray(d.events) || !d.events.every(isEvent)) throw new Error('Журнал повреждён')
-    return this.merge(d.events, true)
+    return this.merge(d.events, true, true)
   }
 
   close() {
@@ -219,8 +246,10 @@ export function isEvent(e: unknown): e is ProfileEvent {
   if (!isObj(e)) return false
   if (typeof e.id !== 'string' || !e.id || typeof e.ts !== 'number' || !Number.isFinite(e.ts)) return false
   if (typeof e.dev !== 'string' || typeof e.type !== 'string' || !isObj(e.data)) return false
-  const { add, set, tasks, skinsAdd, roll } = e.data
-  if (add !== undefined && (!isObj(add) || !Object.values(add).every((v) => Number.isFinite(v)))) return false
+  const { add, max, set, tasks, skinsAdd, roll } = e.data
+  for (const nums of [add, max])
+    if (nums !== undefined && (!isObj(nums) || !Object.values(nums).every((v) => Number.isFinite(v))))
+      return false
   if (set !== undefined && !isObj(set)) return false
   if (tasks !== undefined && !Array.isArray(tasks)) return false
   if (skinsAdd !== undefined && !(Array.isArray(skinsAdd) && skinsAdd.every((s) => typeof s === 'string')))

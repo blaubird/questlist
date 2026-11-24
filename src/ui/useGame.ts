@@ -3,8 +3,21 @@ import { createContext, useContext, useEffect, useState, useSyncExternalStore } 
 import type { Action, Result } from '../core/engine.ts'
 import type { GameState } from '../core/state.ts'
 import type { GameStore } from '../sync/store.ts'
+import type { Sync, SyncStatus } from '../sync/sync.ts'
 
 export const GameCtx = createContext<GameStore | null>(null)
+export const SyncCtx = createContext<Sync | null>(null)
+
+const OFF: SyncStatus = { state: 'off', email: null, pending: 0, last: null, error: null }
+const noSub = () => () => {}
+const offStatus = () => OFF
+
+/** Синхронизация и её статус (state 'off' — сервер не настроен в сборке). */
+export function useSync(): { sync: Sync | null; status: SyncStatus } {
+  const sync = useContext(SyncCtx)
+  const status = useSyncExternalStore(sync?.subscribe ?? noSub, sync?.getStatus ?? offStatus)
+  return { sync, status }
+}
 
 export function useStore(): GameStore {
   const s = useContext(GameCtx)

@@ -178,6 +178,9 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
       const task = p().tasks.find((t) => t.id === op.id)
       if (!task?.done) return fail('Задача не закрыта')
       const add = Object.fromEntries(Object.entries(data.add ?? {}).map(([k, v]) => [k, -(v as number)]))
+      // Награду успели потратить — отмена увела бы золото в минус.
+      if (p().gold < (data.add?.gold ?? 0) || p().torches < (data.add?.torches ?? 0))
+        return fail('Награда уже потрачена')
       const patch: Patch = { add, tasks: [{ op: 'patch', id: op.id, set: { done: false, doneAt: 0 } }] }
       if (data.prev) patch.set = { ...data.prev }
       emit('task.undo', patch)
@@ -204,7 +207,7 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
       if (p().gold < tier.cost) return fail('Не хватает золота')
       emit(action.type, {
         add: { gold: -tier.cost },
-        set: weapon ? { weapon: action.tier } : { armor: action.tier },
+        max: weapon ? { weapon: action.tier } : { armor: action.tier },
       })
       return done()
     }
@@ -282,7 +285,7 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
       })
       emit('run.start', {
         add: { torches: -1, runs: 1 },
-        set: { best: Math.max(prof.best, action.floor) },
+        max: { best: action.floor },
       })
       return done(run, [{ t: 'floor', f: action.floor }])
     }
@@ -303,9 +306,9 @@ export function apply(state: GameState, action: Action, ctx: Ctx): Result {
           kills: r.kills,
           potions: r.potions - r.potionsStart,
           scrolls: r.scrolls,
-          souls,
         },
-        set: { checkpoint, best: Math.max(p().best, r.f) },
+        // Души — функция чекпоинта: два устройства, дошедшие до одного чекпоинта, не удвоят их.
+        max: { checkpoint, best: r.f, souls: soulsFor(checkpoint) },
       })
       return done(null, [], { shards, xp: r.xpGain, floor: r.f, dead: !leaving, souls })
     }

@@ -1284,7 +1284,8 @@ function decoDraw(x, b, X, Y, T, t, h) {
       const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5
       const px = X + T / 2 + Math.cos(a) * T * 0.3,
         py = Y + T / 2 + Math.sin(a) * T * 0.3
-      i ? x.lineTo(px, py) : x.moveTo(px, py)
+      if (i) x.lineTo(px, py)
+      else x.moveTo(px, py)
     }
     x.closePath()
     x.stroke()

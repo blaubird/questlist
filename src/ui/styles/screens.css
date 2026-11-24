@@ -598,6 +598,48 @@ details summary {
   gap: 10px;
 }
 
+/* Синхронизация */
+.sync {
+  display: grid;
+  gap: 12px;
+}
+.save .sync-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--mute);
+}
+.sync-line svg {
+  flex: none;
+  margin-top: 1px;
+}
+.sync-ok svg {
+  color: #7fe0a8;
+}
+.sync-offline svg,
+.sync-signedout svg {
+  color: var(--c-gold);
+}
+.sync-error svg {
+  color: #ff8fa3;
+}
+.sync-form {
+  display: grid;
+  gap: 10px;
+  max-width: 380px;
+}
+.save .sync-form .note {
+  margin: 0;
+}
+.sync-user {
+  align-self: center;
+  margin-right: auto;
+  font-size: 14px;
+  color: var(--mute);
+  overflow-wrap: anywhere;
+}
+
 /* Казино */
 .bet-bar {
   display: flex;
@@ -1082,6 +1124,8 @@ details summary {
   position: absolute;
   inset: auto 0 0;
   display: flex;
+  /* Крестовина справа — под большой палец правой руки, умения слева. */
+  flex-direction: row-reverse;
   justify-content: space-between;
   align-items: flex-end;
   padding: 0 14px calc(var(--safe-bottom) + 14px);

@@ -15,6 +15,7 @@ import {
 import { SKINS, SKIN_BY_ID } from '../../core/skins.ts'
 import { Amt, Meter, Portrait } from '../components/bits.tsx'
 import { RARITY } from '../rarity.ts'
+import { SyncCard } from '../components/SyncCard.tsx'
 import { Icon, type IconName } from '../components/Icon.tsx'
 import { useToasts } from '../components/useToasts.ts'
 import { useGame } from '../useGame.ts'
@@ -273,11 +274,16 @@ export function Hero() {
         </div>
       </section>
 
+      <h2>Синхронизация</h2>
+      <section className="card save">
+        <SyncCard />
+      </section>
+
       <h2>Сохранение</h2>
       <section className="card save">
         <p className="mute">
           {store.status.storage === 'idb'
-            ? 'Прогресс хранится в этом браузере. Синхронизация между устройствами — скоро.'
+            ? 'Прогресс хранится в этом браузере, копия — на сервере (если выполнен вход).'
             : 'Браузер не даёт сохранять данные (приватный режим?) — прогресс пропадёт после закрытия. Сделай копию.'}{' '}
           Импорт объединяет журналы: текущий прогресс не теряется.
         </p>

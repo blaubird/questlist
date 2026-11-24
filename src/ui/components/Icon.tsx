@@ -29,6 +29,7 @@ export type IconName =
   | 'flame'
   | 'chevron'
   | 'dot'
+  | 'cloud'
 
 const paths: Record<IconName, ReactNode> = {
   check: <path d="M5 12.5l4.2 4.2L19 7" />,
@@ -72,6 +73,7 @@ const paths: Record<IconName, ReactNode> = {
   ),
   download: <path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 20h14" />,
   upload: <path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 20h14" />,
+  cloud: <path d="M7 18.5h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.6 9.1 4.7 4.7 0 0 0 7 18.5z" />,
   luck: <path d="M12 2.5l2 7.5 7.5 2-7.5 2-2 7.5-2-7.5-7.5-2 7.5-2z" />,
   soul: (
     <>
